@@ -9,7 +9,7 @@ st.set_page_config(
     layout="centered",
 )
 
-# Inicializar estados en la sesión si no existen
+# Inicializar estados persistentes (aquí es donde enlazaremos Google Sheets)
 if "inventario" not in st.session_state:
   st.session_state.inventario = {}  # {"Tipo de Tarjeta": cantidad}
 
@@ -25,7 +25,7 @@ if "entregas" not in st.session_state:
 RESPONSABLES = ["Edgardo", "Alexandra", "Yeriz", "Alejandro"]
 
 st.title("💳 Control de Inventario y Entregas de Tarjetas")
-st.markdown("Gestión de stock, traslados y entregas a clientes.")
+st.markdown("Gestión de stock, traslados y entregas a clientes (Modo Permanente).")
 
 # Menú lateral de navegación
 menu = st.sidebar.selectbox(
@@ -75,13 +75,11 @@ elif menu == "Ingresar Lote (Inventario)":
 
     if submit_ingreso:
       if tipo_tarjeta:
-        # Actualizar stock
         if tipo_tarjeta in st.session_state.inventario:
           st.session_state.inventario[tipo_tarjeta] += cantidad
         else:
           st.session_state.inventario[tipo_tarjeta] = cantidad
 
-        # Registrar en historial de entradas
         st.session_state.entradas.append({
             "Fecha Registro": datetime.datetime.now().strftime(
                 "%Y-%m-%d %H:%M"
@@ -241,4 +239,4 @@ elif menu == "Historiales y Registros":
       st.dataframe(
           pd.DataFrame(st.session_state.entregas), use_container_width=True
       )
-      
+        
