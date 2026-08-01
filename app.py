@@ -1,6 +1,7 @@
 import datetime
 import pandas as pd
 import streamlit as st
+from streamlit_gsheets import GSheetsConnection
 
 # Configuración inicial de la página
 st.set_page_config(
@@ -9,23 +10,40 @@ st.set_page_config(
     layout="centered",
 )
 
-# Inicializar estados persistentes (aquí es donde enlazaremos Google Sheets)
-if "inventario" not in st.session_state:
-  st.session_state.inventario = {}  # {"Tipo de Tarjeta": cantidad}
+# Conexión a Google Sheets
+conn = st.connection("gsheets", type=GSheetsConnection)
 
-if "entradas" not in st.session_state:
-  st.session_state.entradas = []
+# Cargar datos desde Google Sheets (o inicializar si está vacío)
+try:
+  df_inv_Rem = conn.read(worksheet="Inventario", ttl=0)
+  if df_inv_Rem.empty:
+    inventario = {}
+  else:
+    inventario = dict(
+        zip(df_inv_Rem["Tipo de Tarjeta"], df_inv_Rem["Cantidad Disponible"])
+    )
+except:
+  inventario = {}
 
-if "traslados" not in st.session_state:
-  st.session_state.traslados = []
+try:
+  entradas = conn.read(worksheet="Entradas", ttl=0).dropna(how="all").to_dict("records")
+except:
+  entradas = []
 
-if "entregas" not in st.session_state:
-  st.session_state.entregas = []
+try:
+  traslados = conn.read(worksheet="Traslados", ttl=0).dropna(how="all").to_dict("records")
+except:
+  traslados = []
+
+try:
+  entregas = conn.read(worksheet="Entregas", ttl=0).dropna(how="all").to_dict("records")
+except:
+  entregas = []
 
 RESPONSABLES = ["Edgardo", "Alexandra", "Yeriz", "Alejandro"]
 
 st.title("💳 Control de Inventario y Entregas de Tarjetas")
-st.markdown("Gestión de stock, traslados y entregas a clientes (Modo Permanente).")
+st.markdown("Gestión de stock, traslados y entregas (Guardado Permanente).")
 
 # Menú lateral de navegación
 menu = st.sidebar.selectbox(
@@ -42,11 +60,11 @@ menu = st.sidebar.selectbox(
 # 1. VER INVENTARIO ACTUAL
 if menu == "Ver Inventario":
   st.header("📋 Inventario Actual de Tarjetas")
-  if not st.session_state.inventario:
+  if not inventario:
     st.info("No hay tarjetas registradas en el inventario.")
   else:
     df_inv = pd.DataFrame(
-        list(st.session_state.inventario.items()),
+        list(inventario.items()),
         columns=["Tipo de Tarjeta", "Cantidad Disponible"],
     )
     st.dataframe(df_inv, use_container_width=True)
@@ -75,12 +93,12 @@ elif menu == "Ingresar Lote (Inventario)":
 
     if submit_ingreso:
       if tipo_tarjeta:
-        if tipo_tarjeta in st.session_state.inventario:
-          st.session_state.inventario[tipo_tarjeta] += cantidad
+        if tipo_tarjeta in inventario:
+          inventario[tipo_tarjeta] += cantidad
         else:
-          st.session_state.inventario[tipo_tarjeta] = cantidad
+          inventario[tipo_tarjeta] = cantidad
 
-        st.session_state.entradas.append({
+        entradas.append({
             "Fecha Registro": datetime.datetime.now().strftime(
                 "%Y-%m-%d %H:%M"
             ),
@@ -89,9 +107,20 @@ elif menu == "Ingresar Lote (Inventario)":
             "Cantidad": cantidad,
             "Responsable": responsable,
         })
+
+        # Actualizar Google Sheets
+        conn.update(
+            worksheet="Inventario",
+            data=pd.DataFrame(
+                list(inventario.items()),
+                columns=["Tipo de Tarjeta", "Cantidad Disponible"],
+            ),
+        )
+        conn.update(worksheet="Entradas", data=pd.DataFrame(entradas))
+
         st.success(
-            f"¡Se ingresaron {cantidad} tarjetas de '{tipo_tarjeta}' (Llegada:"
-            f" {fecha_llegada})!"
+            f"¡Se ingresaron {cantidad} tarjetas de '{tipo_tarjeta}' y se guardó"
+            " en Google Drive!"
         )
       else:
         st.warning("Por favor, ingresa el tipo de tarjeta.")
@@ -100,14 +129,14 @@ elif menu == "Ingresar Lote (Inventario)":
 elif menu == "Traslado a Sucursal":
   st.header("🚚 Traslado de Tarjetas a Otra Sucursal")
 
-  if not st.session_state.inventario:
+  if not inventario:
     st.warning("No hay inventario disponible para realizar traslados.")
   else:
-    tarjetas_disponibles = list(st.session_state.inventario.keys())
+    tarjetas_disponibles = list(inventario.keys())
 
     with st.form("form_traslado"):
       tarjeta_sel = st.selectbox("Selecciona la Tarjeta", tarjetas_disponibles)
-      stock_actual = st.session_state.inventario[tarjeta_sel]
+      stock_actual = inventario[tarjeta_sel]
       st.write(f"Stock disponible actual: **{stock_actual}**")
 
       cantidad_traslado = st.number_input(
@@ -131,29 +160,38 @@ elif menu == "Traslado a Sucursal":
               " disponibles."
           )
         else:
-          st.session_state.inventario[tarjeta_sel] -= cantidad_traslado
+          inventario[tarjeta_sel] -= cantidad_traslado
           fecha_hora = datetime.datetime.now().strftime("%Y-%m-%d %H:%M")
 
-          st.session_state.traslados.append({
+          traslados.append({
               "Fecha/Hora": fecha_hora,
               "Tarjeta": tarjeta_sel,
               "Cantidad": cantidad_traslado,
               "Sucursal Destino": sucursal_destino,
               "Responsable": responsable_salida,
           })
+
+          conn.update(
+              worksheet="Inventario",
+              data=pd.DataFrame(
+                  list(inventario.items()),
+                  columns=["Tipo de Tarjeta", "Cantidad Disponible"],
+              ),
+          )
+          conn.update(worksheet="Traslados", data=pd.DataFrame(traslados))
+
           st.success(
-              f"¡Traslado exitoso de {cantidad_traslado} tarjetas de"
-              f" '{tarjeta_sel}' hacia {sucursal_destino}!"
+              f"¡Traslado exitoso y guardado en Google Sheets!"
           )
 
 # 4. REGISTRAR ENTREGA A CLIENTE
 elif menu == "Registrar Entrega a Cliente":
   st.header("👤 Registrar Entrega a Cliente")
 
-  if not st.session_state.inventario:
+  if not inventario:
     st.warning("No hay inventario disponible para entregas.")
   else:
-    tarjetas_disponibles = list(st.session_state.inventario.keys())
+    tarjetas_disponibles = list(inventario.keys())
 
     with st.form("form_entrega"):
       tarjeta_sel = st.selectbox(
@@ -161,7 +199,7 @@ elif menu == "Registrar Entrega a Cliente":
           tarjetas_disponibles,
           key="sel_ent",
       )
-      stock_actual = st.session_state.inventario[tarjeta_sel]
+      stock_actual = inventario[tarjeta_sel]
       st.write(f"Stock disponible actual: **{stock_actual}**")
 
       cantidad_entrega = st.number_input(
@@ -185,19 +223,28 @@ elif menu == "Registrar Entrega a Cliente":
               " disponibles."
           )
         else:
-          st.session_state.inventario[tarjeta_sel] -= cantidad_entrega
+          inventario[tarjeta_sel] -= cantidad_entrega
           fecha_hora = datetime.datetime.now().strftime("%Y-%m-%d %H:%M")
 
-          st.session_state.entregas.append({
+          entregas.append({
               "Fecha/Hora": fecha_hora,
               "Cliente": nombre_cliente,
               "Tarjeta": tarjeta_sel,
               "Cantidad": cantidad_entrega,
               "Responsable": responsable_entrega,
           })
+
+          conn.update(
+              worksheet="Inventario",
+              data=pd.DataFrame(
+                  list(inventario.items()),
+                  columns=["Tipo de Tarjeta", "Cantidad Disponible"],
+              ),
+          )
+          conn.update(worksheet="Entregas", data=pd.DataFrame(entregas))
+
           st.success(
-              f"¡Entrega de {cantidad_entrega} tarjeta(s) de '{tarjeta_sel}' a"
-              f" {nombre_cliente} registrada con éxito!"
+              f"¡Entrega registrada y guardada permanentemente en Google Sheets!"
           )
 
 # 5. HISTORIALES Y REGISTROS
@@ -215,28 +262,22 @@ elif menu == "Historiales y Registros":
 
   if sub_menu == "Historial de Entradas (Llegadas)":
     st.subheader("📥 Registro de Llegadas de Tarjetas")
-    if not st.session_state.entradas:
+    if not entradas:
       st.info("No hay registros de entradas.")
     else:
-      st.dataframe(
-          pd.DataFrame(st.session_state.entradas), use_container_width=True
-      )
+      st.dataframe(pd.DataFrame(entradas), use_container_width=True)
 
   elif sub_menu == "Historial de Traslados":
     st.subheader("🚚 Registro de Traslados a Sucursales")
-    if not st.session_state.traslados:
+    if not traslados:
       st.info("No hay registros de traslados.")
     else:
-      st.dataframe(
-          pd.DataFrame(st.session_state.traslados), use_container_width=True
-      )
+      st.dataframe(pd.DataFrame(traslados), use_container_width=True)
 
   elif sub_menu == "Historial de Entregas a Clientes":
     st.subheader("👤 Registro de Entregas a Clientes")
-    if not st.session_state.entregas:
+    if not entregas:
       st.info("No hay registros de entregas a clientes.")
     else:
-      st.dataframe(
-          pd.DataFrame(st.session_state.entregas), use_container_width=True
-      )
-        
+      st.dataframe(pd.DataFrame(entregas), use_container_width=True)
+            
