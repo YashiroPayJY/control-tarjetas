@@ -1,4 +1,5 @@
 import datetime
+import os
 import pandas as pd
 import streamlit as st
 
@@ -9,23 +10,81 @@ st.set_page_config(
     layout="centered",
 )
 
-# Inicializar almacenamiento persistente con st.session_state conectado a archivos locales en caché/GitHub
-if "inventario" not in st.session_state:
-  st.session_state.inventario = {}
+# Archivo local donde se guardarán los datos permanentemente en la nube
+ARCHIVOS_DATOS = {
+    "inventario": "inventario.csv",
+    "entradas": "entradas.csv",
+    "traslados": "traslados.csv",
+    "entregas": "entregas.csv",
+}
 
-if "entradas" not in st.session_state:
-  st.session_state.entradas = []
 
-if "traslados" not in st.session_state:
-  st.session_state.traslados = []
+# Funciones para leer y escribir en archivos CSV persistentes
+def cargar_datos():
+  # Inventario
+  if os.path.exists(ARCHIVOS_DATOS["inventario"]):
+    df_inv = pd.read_csv(ARCHIVOS_DATOS["inventario"])
+    inventario = dict(
+        zip(df_inv["Tipo de Tarjeta"], df_inv["Cantidad Disponible"])
+    )
+  else:
+    inventario = {}
 
-if "entregas" not in st.session_state:
-  st.session_state.entregas = []
+  # Entradas
+  if os.path.exists(ARCHIVOS_DATOS["entradas"]):
+    entradas = (
+        pd.read_csv(ARCHIVOS_DATOS["entradas"]).dropna(how="all").to_dict("records")
+    )
+  else:
+    entradas = []
+
+  # Traslados
+  if os.path.exists(ARCHIVOS_DATOS["traslados"]):
+    traslados = (
+        pd.read_csv(ARCHIVOS_DATOS["traslados"])
+        .dropna(how="all")
+        .to_dict("records")
+    )
+  else:
+    traslados = []
+
+  # Entregas
+  if os.path.exists(ARCHIVOS_DATOS["entregas"]):
+    entregas = (
+        pd.read_csv(ARCHIVOS_DATOS["entregas"]).dropna(how="all").to_dict("records")
+    )
+  else:
+    entregas = []
+
+  return inventario, entradas, traslados, entregas
+
+
+def guardar_inventario(inventario):
+  if inventario:
+    df = pd.DataFrame(
+        list(inventario.items()),
+        columns=["Tipo de Tarjeta", "Cantidad Disponible"],
+    )
+  else:
+    df = pd.DataFrame(columns=["Tipo de Tarjeta", "Cantidad Disponible"])
+  df.to_csv(ARCHIVOS_DATOS["inventario"], index=False)
+
+
+def guardar_lista(nombre_clave, lista_datos):
+  if lista_datos:
+    df = pd.DataFrame(lista_datos)
+  else:
+    df = pd.DataFrame()
+  df.to_csv(ARCHIVOS_DATOS[nombre_clave], index=False)
+
+
+# Cargar estado actual
+inventario, entradas, traslados, entregas = cargar_datos()
 
 RESPONSABLES = ["Edgardo", "Alexandra", "Yeriz", "Alejandro"]
 
 st.title("💳 Control de Inventario y Entregas de Tarjetas")
-st.markdown("Gestión operativa para el equipo.")
+st.markdown("Gestión operativa con persistencia permanente de datos.")
 
 # Menú lateral de navegación
 menu = st.sidebar.selectbox(
@@ -42,11 +101,11 @@ menu = st.sidebar.selectbox(
 # 1. VER INVENTARIO ACTUAL
 if menu == "Ver Inventario":
   st.header("📋 Inventario Actual de Tarjetas")
-  if not st.session_state.inventario:
+  if not inventario:
     st.info("No hay tarjetas registradas en el inventario.")
   else:
     df_inv = pd.DataFrame(
-        list(st.session_state.inventario.items()),
+        list(inventario.items()),
         columns=["Tipo de Tarjeta", "Cantidad Disponible"],
     )
     st.dataframe(df_inv, use_container_width=True)
@@ -75,12 +134,12 @@ elif menu == "Ingresar Lote (Inventario)":
 
     if submit_ingreso:
       if tipo_tarjeta:
-        if tipo_tarjeta in st.session_state.inventario:
-          st.session_state.inventario[tipo_tarjeta] += cantidad
+        if tipo_tarjeta in inventario:
+          inventario[tipo_tarjeta] += cantidad
         else:
-          st.session_state.inventario[tipo_tarjeta] = cantidad
+          inventario[tipo_tarjeta] = cantidad
 
-        st.session_state.entradas.append({
+        entradas.append({
             "Fecha Registro": datetime.datetime.now().strftime(
                 "%Y-%m-%d %H:%M"
             ),
@@ -89,9 +148,14 @@ elif menu == "Ingresar Lote (Inventario)":
             "Cantidad": cantidad,
             "Responsable": responsable,
         })
+
+        # Guardar en archivos persistentes
+        guardar_inventario(inventario)
+        guardar_lista("entradas", entradas)
+
         st.success(
-            f"¡Se ingresaron {cantidad} tarjetas de '{tipo_tarjeta}'"
-            " correctamente!"
+            f"¡Se ingresaron {cantidad} tarjetas de '{tipo_tarjeta}' y se"
+            " guardaron permanentemente!"
         )
       else:
         st.warning("Por favor, ingresa el tipo de tarjeta.")
@@ -100,14 +164,14 @@ elif menu == "Ingresar Lote (Inventario)":
 elif menu == "Traslado a Sucursal":
   st.header("🚚 Traslado de Tarjetas a Otra Sucursal")
 
-  if not st.session_state.inventario:
+  if not inventario:
     st.warning("No hay inventario disponible para realizar traslados.")
   else:
-    tarjetas_disponibles = list(st.session_state.inventario.keys())
+    tarjetas_disponibles = list(inventario.keys())
 
     with st.form("form_traslado"):
       tarjeta_sel = st.selectbox("Selecciona la Tarjeta", tarjetas_disponibles)
-      stock_actual = st.session_state.inventario[tarjeta_sel]
+      stock_actual = inventario[tarjeta_sel]
       st.write(f"Stock disponible actual: **{stock_actual}**")
 
       cantidad_traslado = st.number_input(
@@ -131,29 +195,33 @@ elif menu == "Traslado a Sucursal":
               " disponibles."
           )
         else:
-          st.session_state.inventario[tarjeta_sel] -= cantidad_traslado
+          inventario[tarjeta_sel] -= cantidad_traslado
           fecha_hora = datetime.datetime.now().strftime("%Y-%m-%d %H:%M")
 
-          st.session_state.traslados.append({
+          traslados.append({
               "Fecha/Hora": fecha_hora,
               "Tarjeta": tarjeta_sel,
               "Cantidad": cantidad_traslado,
               "Sucursal Destino": sucursal_destino,
               "Responsable": responsable_salida,
           })
+
+          guardar_inventario(inventario)
+          guardar_lista("traslados", traslados)
+
           st.success(
               f"¡Traslado exitoso de {cantidad_traslado} tarjetas de"
-              f" '{tarjeta_sel}' hacia {sucursal_destino}!"
+              f" '{tarjeta_sel}' hacia {sucursal_destino} (Guardado)!"
           )
 
 # 4. REGISTRAR ENTREGA A CLIENTE
 elif menu == "Registrar Entrega a Cliente":
   st.header("👤 Registrar Entrega a Cliente")
 
-  if not st.session_state.inventario:
+  if not inventario:
     st.warning("No hay inventario disponible para entregas.")
   else:
-    tarjetas_disponibles = list(st.session_state.inventario.keys())
+    tarjetas_disponibles = list(inventario.keys())
 
     with st.form("form_entrega"):
       tarjeta_sel = st.selectbox(
@@ -161,7 +229,7 @@ elif menu == "Registrar Entrega a Cliente":
           tarjetas_disponibles,
           key="sel_ent",
       )
-      stock_actual = st.session_state.inventario[tarjeta_sel]
+      stock_actual = inventario[tarjeta_sel]
       st.write(f"Stock disponible actual: **{stock_actual}**")
 
       cantidad_entrega = st.number_input(
@@ -185,19 +253,23 @@ elif menu == "Registrar Entrega a Cliente":
               " disponibles."
           )
         else:
-          st.session_state.inventario[tarjeta_sel] -= cantidad_entrega
+          inventario[tarjeta_sel] -= cantidad_entrega
           fecha_hora = datetime.datetime.now().strftime("%Y-%m-%d %H:%M")
 
-          st.session_state.entregas.append({
+          entregas.append({
               "Fecha/Hora": fecha_hora,
               "Cliente": nombre_cliente,
               "Tarjeta": tarjeta_sel,
               "Cantidad": cantidad_entrega,
               "Responsable": responsable_entrega,
           })
+
+          guardar_inventario(inventario)
+          guardar_lista("entregas", entregas)
+
           st.success(
               f"¡Entrega de {cantidad_entrega} tarjeta(s) de '{tarjeta_sel}' a"
-              f" {nombre_cliente} registrada con éxito!"
+              f" {nombre_cliente} guardada permanentemente!"
           )
 
 # 5. HISTORIALES Y REGISTROS
@@ -215,28 +287,22 @@ elif menu == "Historiales y Registros":
 
   if sub_menu == "Historial de Entradas (Llegadas)":
     st.subheader("📥 Registro de Llegadas de Tarjetas")
-    if not st.session_state.entradas:
+    if not entradas:
       st.info("No hay registros de entradas.")
     else:
-      st.dataframe(
-          pd.DataFrame(st.session_state.entradas), use_container_width=True
-      )
+      st.dataframe(pd.DataFrame(entradas), use_container_width=True)
 
   elif sub_menu == "Historial de Traslados":
     st.subheader("🚚 Registro de Traslados a Sucursales")
-    if not st.session_state.traslados:
+    if not traslados:
       st.info("No hay registros de traslados.")
     else:
-      st.dataframe(
-          pd.DataFrame(st.session_state.traslados), use_container_width=True
-      )
+      st.dataframe(pd.DataFrame(traslados), use_container_width=True)
 
   elif sub_menu == "Historial de Entregas a Clientes":
     st.subheader("👤 Registro de Entregas a Clientes")
-    if not st.session_state.entregas:
+    if not entregas:
       st.info("No hay registros de entregas a clientes.")
     else:
-      st.dataframe(
-          pd.DataFrame(st.session_state.entregas), use_container_width=True
-      )
-        
+      st.dataframe(pd.DataFrame(entregas), use_container_width=True)
+              
