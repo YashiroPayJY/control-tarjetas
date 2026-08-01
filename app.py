@@ -149,7 +149,6 @@ elif menu == "Ingresar Lote (Inventario)":
             "Responsable": responsable,
         })
 
-        # Guardar en archivos persistentes
         guardar_inventario(inventario)
         guardar_lista("entradas", entradas)
 
@@ -214,9 +213,9 @@ elif menu == "Traslado a Sucursal":
               f" '{tarjeta_sel}' hacia {sucursal_destino} (Guardado)!"
           )
 
-# 4. REGISTRAR ENTREGA A CLIENTE
+# 4. REGISTRAR ENTREGA DE TARJETA CON EQUIPO FINANCIADO
 elif menu == "Registrar Entrega a Cliente":
-  st.header("👤 Registrar Entrega a Cliente")
+  st.header("👤 Registrar Entrega de Tarjeta y Equipo Financiado")
 
   if not inventario:
     st.warning("No hay inventario disponible para entregas.")
@@ -235,18 +234,36 @@ elif menu == "Registrar Entrega a Cliente":
       cantidad_entrega = st.number_input(
           "Cantidad Entregada", min_value=1, step=1, value=1, key="cant_ent"
       )
-      nombre_cliente = (
-          st.text_input("Nombre del Cliente / Beneficiario").strip().title()
+
+      # Campos adaptados para el equipo financiado y el cliente/celular
+      equipo_financiado = (
+          st.text_input(
+              "Referencia del Equipo Financiado (Ej: Samsung Galaxy A54, iPhone"
+              " 13)"
+          )
+          .strip()
+          .title()
       )
+      nombre_cliente = (
+          st.text_input(
+              "Nombre del Cliente o Número de Celular de Contacto"
+          )
+          .strip()
+          .title()
+      )
+
       responsable_entrega = st.selectbox(
           "Responsable de la Entrega", RESPONSABLES, key="resp_entrega"
       )
 
-      submit_entrega = st.form_submit_button("Confirmar Entrega a Cliente")
+      submit_entrega = st.form_submit_button("Confirmar Entrega")
 
       if submit_entrega:
-        if not nombre_cliente:
-          st.warning("Por favor, ingresa el nombre del cliente.")
+        if not equipo_financiado or not nombre_cliente:
+          st.warning(
+              "Por favor, completa la referencia del equipo financiado y los"
+              " datos del cliente/celular."
+          )
         elif cantidad_entrega > stock_actual:
           st.error(
               f"Stock insuficiente. Solo hay {stock_actual} unidades"
@@ -258,7 +275,8 @@ elif menu == "Registrar Entrega a Cliente":
 
           entregas.append({
               "Fecha/Hora": fecha_hora,
-              "Cliente": nombre_cliente,
+              "Cliente / Celular": nombre_cliente,
+              "Equipo Financiado": equipo_financiado,
               "Tarjeta": tarjeta_sel,
               "Cantidad": cantidad_entrega,
               "Responsable": responsable_entrega,
@@ -268,13 +286,14 @@ elif menu == "Registrar Entrega a Cliente":
           guardar_lista("entregas", entregas)
 
           st.success(
-              f"¡Entrega de {cantidad_entrega} tarjeta(s) de '{tarjeta_sel}' a"
-              f" {nombre_cliente} guardada permanentemente!"
+              f"¡Entrega registrada! Tarjeta '{tarjeta_sel}' vinculada al equipo"
+              f" '{equipo_financiado}' para {nombre_cliente} guardada con"
+              " éxito."
           )
 
-# 5. HISTORIALES Y REGISTROS
+# 5. HISTORIALES Y REGISTROS CON FILTROS
 elif menu == "Historiales y Registros":
-  st.header("📊 Historiales y Auditoría")
+  st.header("📊 Historiales, Filtros y Auditoría")
 
   sub_menu = st.radio(
       "Selecciona el historial que deseas ver:",
@@ -285,24 +304,76 @@ elif menu == "Historiales y Registros":
       ],
   )
 
+  # Controles de filtrado general para los historiales
+  st.markdown("---")
+  st.subheader("🔍 Filtros de Búsqueda")
+  col1, col2 = st.columns(2)
+
+  with col1:
+    filtro_texto = st.text_input(
+        "Buscar por Responsable, Cliente, Celular o Equipo:"
+    ).lower()
+
+  with col2:
+    activar_fechas = st.checkbox("Filtrar por rango de fechas")
+
+  fecha_inicio, fecha_fin = None, None
+  if activar_fechas:
+    c1, c2 = st.columns(2)
+    with c1:
+      fecha_inicio = st.date_input("Fecha de inicio", datetime.date.today())
+    with c2:
+      fecha_fin = st.date_input("Fecha de fin", datetime.date.today())
+
+  st.markdown("---")
+
+
+  def aplicar_filtros(lista_datos, col_fecha):
+    if not lista_datos:
+      return pd.DataFrame()
+
+    df = pd.DataFrame(lista_datos)
+
+    # Filtro de texto (busca en cualquier columna)
+    if filtro_texto:
+      mask = df.astype(str).apply(
+          lambda x: x.str.lower().str.contains(filtro_texto).any(), axis=1
+      )
+      df = df[mask]
+
+    # Filtro de fechas
+    if activar_fechas and col_fecha in df.columns:
+      df["_fecha_temp"] = pd.to_datetime(df[col_fecha]).dt.date
+      df = df[
+          (df["_fecha_temp"] >= fecha_inicio)
+          & (df["_fecha_temp"] <= fecha_fin)
+      ]
+      df = df.drop(columns=["_fecha_temp"])
+
+    return df
+
+
   if sub_menu == "Historial de Entradas (Llegadas)":
     st.subheader("📥 Registro de Llegadas de Tarjetas")
-    if not entradas:
-      st.info("No hay registros de entradas.")
+    df_res = aplicar_filtros(entradas, "Fecha de Llegada")
+    if df_res.empty:
+      st.info("No hay registros que coincidan con los filtros.")
     else:
-      st.dataframe(pd.DataFrame(entradas), use_container_width=True)
+      st.dataframe(df_res, use_container_width=True)
 
   elif sub_menu == "Historial de Traslados":
     st.subheader("🚚 Registro de Traslados a Sucursales")
-    if not traslados:
-      st.info("No hay registros de traslados.")
+    df_res = aplicar_filtros(traslados, "Fecha/Hora")
+    if df_res.empty:
+      st.info("No hay registros que coincidan con los filtros.")
     else:
-      st.dataframe(pd.DataFrame(traslados), use_container_width=True)
+      st.dataframe(df_res, use_container_width=True)
 
   elif sub_menu == "Historial de Entregas a Clientes":
-    st.subheader("👤 Registro de Entregas a Clientes")
-    if not entregas:
-      st.info("No hay registros de entregas a clientes.")
+    st.subheader("👤 Registro de Entregas y Equipos Financiados")
+    df_res = aplicar_filtros(entregas, "Fecha/Hora")
+    if df_res.empty:
+      st.info("No hay registros que coincidan con los filtros.")
     else:
-      st.dataframe(pd.DataFrame(entregas), use_container_width=True)
-              
+      st.dataframe(df_res, use_container_width=True)
+             
