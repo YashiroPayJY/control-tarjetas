@@ -292,7 +292,6 @@ elif menu == "Historiales, Filtros y Excel":
   with col2:
     activar_fechas = st.checkbox("Filtrar por rango de fechas")
 
-  # Filtro específico para tipo de venta en la sección de entregas
   filtro_tipo_venta = "Todos"
   if sub_menu == "Entregas a Clientes (Gestión y Borrado)":
     filtro_tipo_venta = st.selectbox(
@@ -315,7 +314,6 @@ elif menu == "Historiales, Filtros y Excel":
       return pd.DataFrame()
     df = pd.DataFrame(lista_datos)
 
-    # Filtrar por Tipo de Venta si aplica
     if (
         sub_menu == "Entregas a Clientes (Gestión y Borrado)"
         and filtro_tipo_venta != "Todos"
@@ -323,14 +321,12 @@ elif menu == "Historiales, Filtros y Excel":
     ):
       df = df[df["Tipo de Venta"] == filtro_tipo_venta]
 
-    # Filtrar por texto libre
     if filtro_texto:
       mask = df.astype(str).apply(
           lambda x: x.str.lower().str.contains(filtro_texto).any(), axis=1
       )
       df = df[mask]
 
-    # Filtrar por fechas
     if activar_fechas and col_fecha in df.columns:
       df["_fecha_temp"] = pd.to_datetime(df[col_fecha]).dt.date
       df = df[
@@ -359,7 +355,6 @@ elif menu == "Historiales, Filtros y Excel":
           "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
       )
 
-    # PANEL EXCLUSIVO ADMIN PARA BORRAR ENTREGA Y DEVOLVER STOCK
     st.markdown("---")
     st.subheader("⚙️ Panel de Anulación y Devolución (Solo Administrador)")
     if not es_admin:
@@ -369,11 +364,18 @@ elif menu == "Historiales, Filtros y Excel":
       )
     else:
       if entregas:
-        indices_entregas = [
-            f"#{i} - {e['Fecha/Hora']} | {e['Cliente']} | {e['Tipo de Venta']}"
-            f" | Tarjeta: {e['Tarjeta']} (Cant: {e['Cantidad']})"
-            for i, e in enumerate(entregas)
-        ]
+        indices_entregas = []
+        for i, e in enumerate(entregas):
+          f_hora = e.get("Fecha/Hora", "S/F")
+          cli = e.get("Cliente", e.get("Cliente / Celular", "S/C"))
+          t_venta = e.get("Tipo de Venta", "N/A")
+          tarj = e.get("Tarjeta", "N/A")
+          cant = e.get("Cantidad", 1)
+          indices_entregas.append(
+              f"#{i} - {f_hora} | {cli} | {t_venta} | Tarjeta: {tarj} (Cant:"
+              f" {cant})"
+          )
+
         entrega_a_borrar = st.selectbox(
             "Selecciona la entrega a eliminar", indices_entregas
         )
@@ -431,4 +433,4 @@ elif menu == "Historiales, Filtros y Excel":
           "reporte_traslados.xlsx",
           "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
 )
-      
+        
