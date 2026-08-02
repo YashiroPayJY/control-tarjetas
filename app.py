@@ -21,37 +21,50 @@ ARCHIVOS_DATOS = {
 
 
 def cargar_datos():
-  inventario = (
-      dict(
-          zip(
-              pd.read_csv(ARCHIVOS_DATOS["inventario"])["Tipo de Tarjeta"],
-              pd.read_csv(ARCHIVOS_DATOS["inventario"])["Cantidad Disponible"],
-          )
+  # Inventario
+  inventario = {}
+  if os.path.exists(ARCHIVOS_DATOS["inventario"]) and os.path.getsize(ARCHIVOS_DATOS["inventario"]) > 0:
+    try:
+      df_inv = pd.read_csv(ARCHIVOS_DATOS["inventario"])
+      if not df_inv.empty and "Tipo de Tarjeta" in df_inv.columns:
+        inventario = dict(
+            zip(df_inv["Tipo de Tarjeta"], df_inv["Cantidad Disponible"])
+        )
+    except:
+      inventario = {}
+
+  # Entradas
+  entradas = []
+  if os.path.exists(ARCHIVOS_DATOS["entradas"]) and os.path.getsize(ARCHIVOS_DATOS["entradas"]) > 0:
+    try:
+      entradas = (
+          pd.read_csv(ARCHIVOS_DATOS["entradas"]).dropna(how="all").to_dict("records")
       )
-      if os.path.exists(ARCHIVOS_DATOS["inventario"])
-      else {}
-  )
-  entradas = (
-      pd.read_csv(ARCHIVOS_DATOS["entradas"])
-      .dropna(how="all")
-      .to_dict("records")
-      if os.path.exists(ARCHIVOS_DATOS["entradas"])
-      else []
-  )
-  traslados = (
-      pd.read_csv(ARCHIVOS_DATOS["traslados"])
-      .dropna(how="all")
-      .to_dict("records")
-      if os.path.exists(ARCHIVOS_DATOS["traslados"])
-      else []
-  )
-  entregas = (
-      pd.read_csv(ARCHIVOS_DATOS["entregas"])
-      .dropna(how="all")
-      .to_dict("records")
-      if os.path.exists(ARCHIVOS_DATOS["entregas"])
-      else []
-  )
+    except:
+      entradas = []
+
+  # Traslados
+  traslados = []
+  if os.path.exists(ARCHIVOS_DATOS["traslados"]) and os.path.getsize(ARCHIVOS_DATOS["traslados"]) > 0:
+    try:
+      traslados = (
+          pd.read_csv(ARCHIVOS_DATOS["traslados"])
+          .dropna(how="all")
+          .to_dict("records")
+      )
+    except:
+      traslados = []
+
+  # Entregas
+  entregas = []
+  if os.path.exists(ARCHIVOS_DATOS["entregas"]) and os.path.getsize(ARCHIVOS_DATOS["entregas"]) > 0:
+    try:
+      entregas = (
+          pd.read_csv(ARCHIVOS_DATOS["entregas"]).dropna(how="all").to_dict("records")
+      )
+    except:
+      entregas = []
+
   return inventario, entradas, traslados, entregas
 
 
@@ -433,4 +446,4 @@ elif menu == "Historiales, Filtros y Excel":
           "reporte_traslados.xlsx",
           "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
 )
-        
+    
