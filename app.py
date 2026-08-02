@@ -17,7 +17,6 @@ ARCHIVOS_DATOS = {
     "entradas": "entradas.csv",
     "traslados": "traslados.csv",
     "entregas": "entregas.csv",
-    "novedades": "novedades.csv",
 }
 
 
@@ -53,14 +52,7 @@ def cargar_datos():
       if os.path.exists(ARCHIVOS_DATOS["entregas"])
       else []
   )
-  novedades = (
-      pd.read_csv(ARCHIVOS_DATOS["novedades"])
-      .dropna(how="all")
-      .to_dict("records")
-      if os.path.exists(ARCHIVOS_DATOS["novedades"])
-      else []
-  )
-  return inventario, entradas, traslados, entregas, novedades
+  return inventario, entradas, traslados, entregas
 
 
 def guardar_inventario(inventario):
@@ -89,23 +81,23 @@ def convertir_a_excel(df):
 
 
 # Cargar datos
-inventario, entradas, traslados, entregas, novedades = cargar_datos()
+inventario, entradas, traslados, entregas = cargar_datos()
 
 RESPONSABLES = ["Edgardo", "Alexandra", "Yeriz", "Alejandro"]
-SUCURSALES = ["Sucursal Principal", "Norte", "Sur", "Centro", "Otra Sucursal"]
+TIPOS_VENTA = ["Venta en tienda", "Cliente agendado"]
 
 st.title("💳 Control de Inventario y Entregas")
-st.markdown("Gestión operativa avanzada con panel de administrador.")
+st.markdown("Gestión operativa con control de inventario permanente.")
 
-# Control de Acceso de Administrador en el Sidebar
+# Control de Acceso de Administrador exclusivo para borrar entregas
 st.sidebar.markdown("---")
 st.sidebar.subheader("🔐 Acceso Administrador")
 es_admin = False
 password_ingresada = st.sidebar.text_input(
     "Contraseña Admin", type="password", key="pass_admin"
 )
-if password_ingresada == "admin123":  # Cambia aquí tu contraseña si lo deseas
-  st.sidebar.success("Modo Administrador Activo 🔓")
+if password_ingresada == "admin123":  # Puedes cambiar la contraseña aquí
+  st.sidebar.success("Modo Admin Activo 🔓 (Permite borrar entregas)")
   es_admin = True
 elif password_ingresada:
   st.sidebar.error("Contraseña incorrecta")
@@ -118,7 +110,6 @@ menu = st.sidebar.selectbox(
         "Ingresar Lote (Inventario)",
         "Traslado a Sucursal",
         "Registrar Entrega a Cliente",
-        "Reportar Novedad (Sucursal)",
         "Historiales, Filtros y Excel",
     ],
 )
@@ -189,14 +180,18 @@ elif menu == "Traslado a Sucursal":
       cantidad_traslado = st.number_input(
           "Cantidad a Trasladar", min_value=1, step=1, value=1
       )
-      sucursal_destino = st.selectbox("Sucursal de Destino", SUCURSALES)
+      sucursal_destino = (
+          st.text_input("Sucursal de Destino").strip().title()
+      )
       responsable_salida = st.selectbox(
           "Responsable del Traslado", RESPONSABLES, key="resp_traslado"
       )
       submit_traslado = st.form_submit_button("Confirmar Traslado")
 
       if submit_traslado:
-        if cantidad_traslado > stock_actual:
+        if not sucursal_destino:
+          st.warning("Indica la sucursal de destino.")
+        elif cantidad_traslado > stock_actual:
           st.error(
               f"Stock insuficiente. Solo hay {stock_actual} unidades"
               " disponibles."
@@ -214,13 +209,11 @@ elif menu == "Traslado a Sucursal":
           })
           guardar_inventario(inventario)
           guardar_lista("traslados", traslados)
-          st.success(
-              f"¡Traslado exitoso a {sucursal_destino} registrado y guardado!"
-          )
+          st.success("¡Traslado registrado y guardado con éxito!")
 
-# 4. REGISTRAR ENTREGA DE TARJETA CON EQUIPO FINANCIADO
+# 4. REGISTRAR ENTREGA A CLIENTE
 elif menu == "Registrar Entrega a Cliente":
-  st.header("👤 Registrar Entrega de Tarjeta y Equipo Financiado")
+  st.header("👤 Registrar Entrega de Tarjeta")
   if not inventario:
     st.warning("No hay inventario disponible para entregas.")
   else:
@@ -232,9 +225,14 @@ elif menu == "Registrar Entrega a Cliente":
       )
       stock_actual = inventario[tarjeta_sel]
       st.write(f"Stock disponible actual: **{stock_actual}**")
+
       cantidad_entrega = st.number_input(
           "Cantidad Entregada", min_value=1, step=1, value=1, key="cant_ent"
       )
+      nombre_cliente = (
+          st.text_input("Nombre del Cliente / Celular").strip().title()
+      )
+      tipo_venta = st.selectbox("Tipo de Entrega / Venta", TIPOS_VENTA)
       equipo_financiado = (
           st.text_input(
               "Referencia del Equipo Financiado (Ej: Samsung Galaxy A54)"
@@ -242,21 +240,15 @@ elif menu == "Registrar Entrega a Cliente":
           .strip()
           .title()
       )
-      nombre_cliente = (
-          st.text_input(
-              "Nombre del Cliente o Número de Celular de Contacto"
-          )
-          .strip()
-          .title()
-      )
       responsable_entrega = st.selectbox(
-          "Responsable de la Entrega", RESPONSABLES, key="resp_entrega"
+          "Asesor Responsable", RESPONSABLES, key="resp_entrega"
       )
+
       submit_entrega = st.form_submit_button("Confirmar Entrega")
 
       if submit_entrega:
-        if not equipo_financiado or not nombre_cliente:
-          st.warning("Completa la referencia del equipo y los datos del cliente.")
+        if not nombre_cliente or not equipo_financiado:
+          st.warning("Por favor completa el nombre del cliente y el equipo.")
         elif cantidad_entrega > stock_actual:
           st.error(f"Stock insuficiente ({stock_actual} disponibles).")
         else:
@@ -265,75 +257,47 @@ elif menu == "Registrar Entrega a Cliente":
               "Fecha/Hora": datetime.datetime.now().strftime(
                   "%Y-%m-%d %H:%M"
               ),
-              "Cliente / Celular": nombre_cliente,
+              "Cliente": nombre_cliente,
+              "Tipo de Venta": tipo_venta,
               "Equipo Financiado": equipo_financiado,
               "Tarjeta": tarjeta_sel,
               "Cantidad": cantidad_entrega,
-              "Responsable": responsable_entrega,
+              "Asesor": responsable_entrega,
           })
           guardar_inventario(inventario)
           guardar_lista("entregas", entregas)
           st.success("¡Entrega registrada e inventario actualizado con éxito!")
 
-# 5. REPORTAR NOVEDAD (SUCURSAL DIFERENTE)
-elif menu == "Reportar Novedad (Sucursal)":
-  st.header("📢 Cuadro de Novedades por Sucursal")
-  st.markdown(
-      "Registra incidencias, ajustes o novedades operativas de sucursales."
-  )
-
-  with st.form("form_novedad"):
-    sucursal_afectada = st.selectbox(
-        "Selecciona Sucursal", SUCURSALES, key="nov_suc"
-    )
-    tipo_novedad = st.selectbox(
-        "Tipo de Novedad",
-        [
-            "Diferencia en inventario físico",
-            "Faltante en traslado",
-            "Devolución de cliente / anulación",
-            "Otro",
-        ],
-    )
-    descripcion = st.text_area("Descripción detallada de la novedad")
-    reporta = st.selectbox("Reporta", RESPONSABLES, key="nov_rep")
-    submit_nov = st.form_submit_button("Enviar Novedad al Cuadro")
-
-    if submit_nov:
-      if not descripcion:
-        st.warning("Por favor escribe la descripción de la novedad.")
-      else:
-        novedades.append({
-            "Fecha/Hora": datetime.datetime.now().strftime("%Y-%m-%d %H:%M"),
-            "Sucursal": sucursal_afectada,
-            "Tipo Novedad": tipo_novedad,
-            "Descripción": descripcion,
-            "Reportado Por": reporta,
-        })
-        guardar_lista("novedades", novedades)
-        st.success("¡Novedad registrada correctamente en el cuadro de control!")
-
-# 6. HISTORIALES, FILTROS Y EXCEL
-elif menu == "Historiales y Registros":
-  st.header("📊 Historiales, Filtros, Auditoría y Exportación")
+# 5. HISTORIALES, FILTROS Y EXCEL
+elif menu == "Historiales, Filtros y Excel":
+  st.header("📊 Historiales, Filtros y Exportación")
 
   sub_menu = st.radio(
-      "Selecciona el registro:",
+      "Selecciona el historial:",
       [
+          "Entregas a Clientes (Gestión y Borrado)",
           "Entradas (Llegadas)",
           "Traslados",
-          "Entregas a Clientes (Gestión de Devoluciones)",
-          "Cuadro de Novedades",
       ],
   )
 
   st.markdown("---")
-  st.subheader("🔍 Filtros de Búsqueda")
+  st.subheader("🔍 Filtros de Búsqueda y Reportes")
+
   col1, col2 = st.columns(2)
   with col1:
-    filtro_texto = st.text_input("Buscar por palabra clave:").lower()
+    filtro_texto = st.text_input(
+        "Buscar por Cliente, Equipo o Asesor:"
+    ).lower()
   with col2:
     activar_fechas = st.checkbox("Filtrar por rango de fechas")
+
+  # Filtro específico para tipo de venta en la sección de entregas
+  filtro_tipo_venta = "Todos"
+  if sub_menu == "Entregas a Clientes (Gestión y Borrado)":
+    filtro_tipo_venta = st.selectbox(
+        "Filtrar por Tipo de Venta:", ["Todos"] + TIPOS_VENTA
+    )
 
   fecha_inicio, fecha_fin = None, None
   if activar_fechas:
@@ -350,11 +314,23 @@ elif menu == "Historiales y Registros":
     if not lista_datos:
       return pd.DataFrame()
     df = pd.DataFrame(lista_datos)
+
+    # Filtrar por Tipo de Venta si aplica
+    if (
+        sub_menu == "Entregas a Clientes (Gestión y Borrado)"
+        and filtro_tipo_venta != "Todos"
+        and "Tipo de Venta" in df.columns
+    ):
+      df = df[df["Tipo de Venta"] == filtro_tipo_venta]
+
+    # Filtrar por texto libre
     if filtro_texto:
       mask = df.astype(str).apply(
           lambda x: x.str.lower().str.contains(filtro_texto).any(), axis=1
       )
       df = df[mask]
+
+    # Filtrar por fechas
     if activar_fechas and col_fecha in df.columns:
       df["_fecha_temp"] = pd.to_datetime(df[col_fecha]).dt.date
       df = df[
@@ -362,10 +338,69 @@ elif menu == "Historiales y Registros":
           & (df["_fecha_temp"] <= fecha_fin)
       ]
       df = df.drop(columns=["_fecha_temp"])
+
     return df
 
 
-  if sub_menu == "Entradas (Llegadas)":
+  if sub_menu == "Entregas a Clientes (Gestión y Borrado)":
+    st.subheader("👤 Registro de Entregas y Equipos Financiados")
+    df_res = aplicar_filtros(entregas, "Fecha/Hora")
+    st.dataframe(
+        df_res if not df_res.empty else pd.DataFrame(),
+        use_container_width=True,
+    )
+
+    if not df_res.empty:
+      excel_data = convertir_a_excel(df_res)
+      st.download_button(
+          "📥 Descargar Entregas en Excel",
+          excel_data,
+          "reporte_entregas.xlsx",
+          "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      )
+
+    # PANEL EXCLUSIVO ADMIN PARA BORRAR ENTREGA Y DEVOLVER STOCK
+    st.markdown("---")
+    st.subheader("⚙️ Panel de Anulación y Devolución (Solo Administrador)")
+    if not es_admin:
+      st.warning(
+          "🔒 Ingresa la contraseña de Administrador en la barra lateral para"
+          " poder borrar entregas y reponer el stock al inventario."
+      )
+    else:
+      if entregas:
+        indices_entregas = [
+            f"#{i} - {e['Fecha/Hora']} | {e['Cliente']} | {e['Tipo de Venta']}"
+            f" | Tarjeta: {e['Tarjeta']} (Cant: {e['Cantidad']})"
+            for i, e in enumerate(entregas)
+        ]
+        entrega_a_borrar = st.selectbox(
+            "Selecciona la entrega a eliminar", indices_entregas
+        )
+
+        if st.button(
+            "🗑️ Borrar Entrega y Devolver Tarjeta(s) al Inventario de"
+            " Inmediato"
+        ):
+          idx = int(entrega_a_borrar.split("#")[1].split(" -")[0])
+          item_eliminado = entregas.pop(idx)
+
+          tarjeta_devuelta = item_eliminado["Tarjeta"]
+          cant_devuelta = item_eliminado["Cantidad"]
+          inventario[tarjeta_devuelta] = (
+              inventario.get(tarjeta_devuelta, 0) + cant_devuelta
+          )
+
+          guardar_inventario(inventario)
+          guardar_lista("entregas", entregas)
+
+          st.success(
+              f"¡Entrega eliminada! Se han devuelto {cant_devuelta} unidad(es)"
+              f" de '{tarjeta_devuelta}' al inventario de forma inmediata."
+          )
+          st.rerun()
+
+  elif sub_menu == "Entradas (Llegadas)":
     st.subheader("📥 Registro de Entradas")
     df_res = aplicar_filtros(entradas, "Fecha de Llegada")
     st.dataframe(
@@ -377,7 +412,7 @@ elif menu == "Historiales y Registros":
       st.download_button(
           "📥 Descargar Entradas en Excel",
           excel_data,
-          "entradas_tarjetas.xlsx",
+          "reporte_entradas.xlsx",
           "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
       )
 
@@ -393,77 +428,7 @@ elif menu == "Historiales y Registros":
       st.download_button(
           "📥 Descargar Traslados en Excel",
           excel_data,
-          "traslados_tarjetas.xlsx",
+          "reporte_traslados.xlsx",
           "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-      )
-
-  elif sub_menu == "Entregas a Clientes (Gestión de Devoluciones)":
-    st.subheader("👤 Registro de Entregas y Devoluciones")
-    df_res = aplicar_filtros(entregas, "Fecha/Hora")
-    st.dataframe(
-        df_res if not df_res.empty else pd.DataFrame(),
-        use_container_width=True,
-    )
-
-    if not df_res.empty:
-      excel_data = convertir_a_excel(df_res)
-      st.download_button(
-          "📥 Descargar Entregas en Excel",
-          excel_data,
-          "entregas_tarjetas.xlsx",
-          "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-      )
-
-    st.markdown("---")
-    st.subheader("⚙️ Panel de Devoluciones y Anulación (Admin)")
-    if not es_admin:
-      st.warning(
-          "🔒 Ingresa la contraseña de Administrador en el menú lateral para"
-          " poder borrar entregas y devolver stock al inventario."
-      )
-    else:
-      if entregas:
-        indices_entregas = [
-            f"#{i} - {e['Fecha/Hora']} | {e['Cliente / Celular']} | Tarjeta:"
-            f" {e['Tarjeta']} (Cant: {e['Cantidad']})"
-            for i, e in enumerate(entregas)
-        ]
-        entrega_a_borrar = st.selectbox(
-            "Selecciona la entrega a eliminar/devolver", indices_entregas
-        )
-
-        if st.button("🗑️ Borrar Entrega y Devolver Tarjetas al Inventario"):
-          idx = int(entrega_a_borrar.split("#")[1].split(" -")[0])
-          item_eliminado = entregas.pop(idx)
-
-          tarjeta_devuelta = item_eliminado["Tarjeta"]
-          cant_devuelta = item_eliminado["Cantidad"]
-          inventario[tarjeta_devuelta] = (
-              inventario.get(tarjeta_devuelta, 0) + cant_devuelta
-          )
-
-          guardar_inventario(inventario)
-          guardar_lista("entregas", entregas)
-
-          st.success(
-              f"¡Entrega eliminada con éxito! Se devolvieron {cant_devuelta}"
-              f" unidad(es) de '{tarjeta_devuelta}' al inventario."
-          )
-          st.rerun()
-
-  elif sub_menu == "Cuadro de Novedades":
-    st.subheader("📢 Reporte de Novedades de Sucursales")
-    df_res = aplicar_filtros(novedades, "Fecha/Hora")
-    st.dataframe(
-        df_res if not df_res.empty else pd.DataFrame(),
-        use_container_width=True,
-    )
-    if not df_res.empty:
-      excel_data = convertir_a_excel(df_res)
-      st.download_button(
-          "📥 Descargar Novedades en Excel",
-          excel_data,
-          "novedades_sucursales.xlsx",
-          "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                )
-            
+)
+      
