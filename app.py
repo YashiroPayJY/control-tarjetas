@@ -1,3 +1,4 @@
+import calendar
 import datetime
 from zoneinfo import ZoneInfo
 import io
@@ -15,7 +16,7 @@ st.set_page_config(
 ARCHIVOS_DATOS = {
     "inventario": "inventario.csv",
     "entradas": "entradas.csv",
-    "creditos": "creditos.csv",  # Registro de financiaciones Payjoy
+    "creditos": "creditos.csv",
     "traslados": "traslados.csv",
 }
 
@@ -159,18 +160,13 @@ if menu == "📊 Dashboard & Cumplimiento de Meta":
 
   ahora = obtener_hora_colombia()
   dia_actual = ahora.day
-  # Calcular días totales del mes actual
-  import calendar
-
   dias_mes_total = calendar.monthrange(ahora.year, ahora.month)[1]
 
-  # Procesar créditos del mes actual para las métricas
   df_creditos = pd.DataFrame(creditos) if creditos else pd.DataFrame()
 
   total_ventas_mes = 0
   if not df_creditos.empty and "Fecha" in df_creditos.columns:
     df_creditos["_fecha_dt"] = pd.to_datetime(df_creditos["Fecha"])
-    # Filtrar solo el mes y año actual
     df_mes_actual = df_creditos[
         (df_creditos["_fecha_dt"].dt.month == ahora.month)
         & (df_creditos["_fecha_dt"].dt.year == ahora.year)
@@ -183,21 +179,18 @@ if menu == "📊 Dashboard & Cumplimiento de Meta":
   else:
     df_mes_actual = pd.DataFrame()
 
-  # Cálculos de cumplimiento y proyecciones
   porcentaje_cumplimiento = min(
       round((total_ventas_mes / META_MENSUAL) * 100, 2), 100.0
   )
   promedio_diario = total_ventas_mes / dia_actual if dia_actual > 0 else 0
   proyeccion_cierre = int(promedio_diario * dias_mes_total)
 
-  # Métricas superiores (KPIs)
   c1, c2, c3, c4 = st.columns(4)
   c1.metric("🎯 Meta Mensual", f"{META_MENSUAL} Créditos")
   c2.metric("✅ Créditos Vendidos (Mes)", f"{total_ventas_mes}")
   c3.metric("📊 % Cumplimiento Global", f"{porcentaje_cumplimiento}%")
   c4.metric("🔮 Proyección Cierre de Mes", f"{proyeccion_cierre} Créditos")
 
-  # Barra de progreso visual
   st.markdown("### Progreso hacia la Meta Mensual")
   st.progress(min(total_ventas_mes / META_MENSUAL, 1.0))
 
@@ -263,11 +256,6 @@ if menu == "📊 Dashboard & Cumplimiento de Meta":
 # 1. REGISTRAR VENTA DE CRÉDITO PAYJOY
 elif menu == "📱 Registrar Venta de Crédito Payjoy":
   st.header("📱 Registrar Nueva Venta de Crédito Payjoy")
-  st.markdown(
-      "Registra la financiación del celular y controla si el cliente lleva"
-      " tarjeta física de stock."
-  )
-
   with st.form("form_credito"):
     nombre_cliente = (
         st.text_input("Nombre del Cliente / Celular de Contacto")
@@ -283,7 +271,6 @@ elif menu == "📱 Registrar Venta de Crédito Payjoy":
     )
     tipo_venta = st.selectbox("Tipo de Venta", TIPOS_VENTA)
 
-    # Control de Tarjeta Física (Stock)
     lleva_tarjeta = st.selectbox(
         "¿Lleva Tarjeta Física (Mastercard By Payjoy)?", ["No", "Sí"]
     )
@@ -325,20 +312,18 @@ elif menu == "📱 Registrar Venta de Crédito Payjoy":
             f"Stock insuficiente de tarjetas ({stock_actual} disponibles)."
         )
       else:
-        # Descontar inventario de tarjeta si aplica
         if lleva_tarjeta == "Sí" and tarjeta_sel:
           inventario[tarjeta_sel] -= cantidad_tarjetas
           guardar_inventario(inventario)
 
-        # Registrar el crédito Payjoy
         creditos.append({
             "Fecha": str(fecha_venta),
             "Cliente": nombre_cliente,
             "Equipo Financiado": equipo_financiado,
             "Tipo de Venta": tipo_venta,
-            "Llevar Tarjeta": lleva_tarjeta,
+            "¿Lleva Tarjeta?": lleva_tarjeta,
             "Tarjeta Entregada": tarjeta_sel if lleva_tarjeta == "Sí" else "N/A",
-            "Cantidad": 1,  # Cada registro cuenta como 1 crédito para la meta
+            "Cantidad": 1,
             "Asesor": asesor_responsable,
         })
         guardar_lista("creditos", creditos)
@@ -459,8 +444,10 @@ elif menu == "📂 Historiales y Reportes":
 
   filtro_tipo_venta = "Todos"
   filtro_asesor = "Todos"
+  filtro_tarjeta_estado = "Todos"
+
   if sub_menu == "Créditos Payjoy Vendidos":
-    cc1, cc2 = st.columns(2)
+    cc1, cc2, cc3 = st.columns(3)
     with cc1:
       filtro_tipo_venta = st.selectbox(
           "Filtrar por Tipo de Venta:", ["Todos"] + TIPOS_VENTA
@@ -468,6 +455,10 @@ elif menu == "📂 Historiales y Reportes":
     with cc2:
       filtro_asesor = st.selectbox(
           "Filtrar por Asesor:", ["Todos"] + RESPONSABLES
+      )
+    with cc3:
+      filtro_tarjeta_estado = st.selectbox(
+          "Filtrar por Tarjeta Física:", ["Todos", "Sí", "No"]
       )
 
   fecha_inicio, fecha_fin = None, None
@@ -492,6 +483,9 @@ elif menu == "📂 Historiales y Reportes":
         df = df[df["Tipo de Venta"] == filtro_tipo_venta]
       if filtro_asesor != "Todos" and "Asesor" in df.columns:
         df = df[df["Asesor"] == filtro_asesor]
+      if filtro_tarjeta_estado != "Todos" and "¿Lleva Tarjeta?" in df.columns:
+        df = df[df["¿Lleva Tarjeta?"] == filtro_tarjeta_estado]
+
     if filtro_texto:
       mask = df.astype(str).apply(
           lambda x: x.str.lower().str.contains(filtro_texto).any(), axis=1
@@ -541,11 +535,11 @@ elif menu == "📂 Historiales y Reportes":
           t_venta = c.get("Tipo de Venta", "N/A")
           eq = c.get("Equipo Financiado", "N/A")
           asesor = c.get("Asesor", "N/A")
-          lleva_t = c.get("Llevar Tarjeta", "No")
+          lleva_t = c.get("¿Lleva Tarjeta?", "No")
           tarj = c.get("Tarjeta Entregada", "N/A")
           indices_creditos.append(
               f"#{i} - {f_fecha} | Asesor: {asesor} | {cli} | {eq} |"
-              f" {t_venta} | Tarjeta: {tarj}"
+              f" {t_venta} | ¿Lleva Tarjeta?: {lleva_t}"
           )
 
         credito_a_borrar = st.selectbox(
@@ -555,8 +549,7 @@ elif menu == "📂 Historiales y Reportes":
           idx = int(credito_a_borrar.split("#")[1].split(" -")[0])
           item_eliminado = creditos.pop(idx)
 
-          # Si llevaba tarjeta física, devolverla al inventario
-          if item_eliminado.get("Llevar Tarjeta") == "Sí":
+          if item_eliminado.get("¿Lleva Tarjeta?") == "Sí":
             tarjeta_devuelta = item_eliminado.get("Tarjeta Entregada")
             if tarjeta_devuelta and tarjeta_devuelta != "N/A":
               inventario[tarjeta_devuelta] = (
@@ -601,5 +594,5 @@ elif menu == "📂 Historiales y Reportes":
           excel_data,
           "reporte_traslados.xlsx",
           "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        )
-            
+      )
+      
