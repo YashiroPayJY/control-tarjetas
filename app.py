@@ -445,5 +445,5 @@ elif menu == "Historiales, Filtros y Excel":
           excel_data,
           "reporte_traslados.xlsx",
           "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-)
-    
+        )
+            
