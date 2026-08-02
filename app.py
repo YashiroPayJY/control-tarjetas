@@ -514,7 +514,6 @@ elif menu == "📂 Historiales y Reportes":
     st.subheader("📱 Reporte Detallado de Créditos Payjoy")
     df_res = aplicar_filtros(creditos, "Fecha")
 
-    # Gráfico de participación y aporte por marca en el reporte detallado filtrado
     if not df_res.empty:
       st.markdown("##### 📊 Análisis de Ventas por Marca (Según Filtros)")
       df_marca_rep = (
@@ -550,7 +549,6 @@ elif menu == "📂 Historiales y Reportes":
           "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
       )
 
-    # Panel de Administrador para Anular Crédito
     st.markdown("---")
     st.subheader("⚙️ Panel de Anulación de Créditos (Solo Administrador)")
     if not es_admin:
@@ -623,4 +621,7 @@ elif menu == "📂 Historiales y Reportes":
       excel_data = convertir_a_excel(df_res)
       st.download_button(
           "📥 Descargar Traslados en Excel",
-     
+          excel_data,
+          "reporte_traslados.xlsx",
+          "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        
