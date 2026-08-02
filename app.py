@@ -134,7 +134,7 @@ MARCAS_CELULAR = [
     "Tecno",
     "Realme",
 ]
-META_MENSUAL = 185  # Meta mensual de créditos
+META_MENSUAL = 185
 
 # Interfaz Principal
 st.title("📱 Control Operativo Payjoy & Financiación de Celulares")
@@ -274,7 +274,6 @@ elif menu == "📱 Registrar Venta de Crédito Payjoy":
     )
     marca_celular = st.selectbox("Marca del Equipo Financiado", MARCAS_CELULAR)
     tipo_venta = st.selectbox("Tipo de Venta", TIPOS_VENTA)
-
     lleva_tarjeta = st.selectbox(
         "¿Lleva Tarjeta Física (Mastercard By Payjoy)?", ["No", "Sí"]
     )
@@ -543,10 +542,12 @@ elif menu == "📂 Historiales y Reportes":
     if not df_res.empty:
       excel_data = convertir_a_excel(df_res)
       st.download_button(
-          "📥 Descargar Créditos en Excel",
-          excel_data,
-          "reporte_creditos_payjoy.xlsx",
-          "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+          label="📥 Descargar Créditos en Excel",
+          data=excel_data,
+          file_name="reporte_creditos_payjoy.xlsx",
+          mime=(
+              "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+          ),
       )
 
     st.markdown("---")
@@ -575,7 +576,9 @@ elif menu == "📂 Historiales y Reportes":
         credito_a_borrar = st.selectbox(
             "Selecciona el crédito a anular", indices_creditos
         )
-        if st.button("🗑️ Anular Crédito y Devolver Tarjeta al Inventario (Si aplica)"):
+        if st.button(
+            "🗑️ Anular Crédito y Devolver Tarjeta al Inventario (Si aplica)"
+        ):
           idx = int(credito_a_borrar.split("#")[1].split(" -")[0])
           item_eliminado = creditos.pop(idx)
 
@@ -604,10 +607,12 @@ elif menu == "📂 Historiales y Reportes":
     if not df_res.empty:
       excel_data = convertir_a_excel(df_res)
       st.download_button(
-          "📥 Descargar Entradas en Excel",
-          excel_data,
-          "reporte_lotes_tarjetas.xlsx",
-          "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+          label="📥 Descargar Entradas en Excel",
+          data=excel_data,
+          file_name="reporte_lotes_tarjetas.xlsx",
+          mime=(
+              "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+          ),
       )
 
   elif sub_menu == "Traslados":
@@ -620,8 +625,6 @@ elif menu == "📂 Historiales y Reportes":
     if not df_res.empty:
       excel_data = convertir_a_excel(df_res)
       st.download_button(
-          "📥 Descargar Traslados en Excel",
-          excel_data,
-          "reporte_traslados.xlsx",
-          "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        
+          label="📥 Descargar Traslados en Excel",
+          data=excel_data,
+   
