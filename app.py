@@ -123,6 +123,17 @@ RESPONSABLES = [
     "A Rutero",
 ]
 TIPOS_VENTA = ["Venta en tienda", "Cliente agendado"]
+MARCAS_CELULAR = [
+    "Samsung",
+    "Motorola",
+    "Oppo",
+    "Infinix",
+    "Vivo",
+    "Xiaomi",
+    "Honor",
+    "Tecno",
+    "Realme",
+]
 META_MENSUAL = 185  # Meta mensual de créditos
 
 # Interfaz Principal
@@ -218,21 +229,20 @@ if menu == "📊 Dashboard & Cumplimiento de Meta":
       st.plotly_chart(fig_pie, use_container_width=True)
 
     with g2:
-      st.subheader("📊 Créditos por Tipo de Venta")
-      df_venta = (
-          df_mes_actual.groupby("Tipo de Venta")["Cantidad"]
+      st.subheader("📱 Participación por Marca de Celular")
+      df_marca = (
+          df_mes_actual.groupby("Marca de Celular")["Cantidad"]
           .sum()
           .reset_index()
       )
-      fig_bar = px.bar(
-          df_venta,
-          x="Tipo de Venta",
+      fig_marca = px.bar(
+          df_marca,
+          x="Marca de Celular",
           y="Cantidad",
-          color="Tipo de Venta",
+          color="Marca de Celular",
           text="Cantidad",
-          color_discrete_sequence=["#00CC96", "#AB63FA"],
       )
-      st.plotly_chart(fig_bar, use_container_width=True)
+      st.plotly_chart(fig_marca, use_container_width=True)
 
     st.markdown("### 🏆 Rendimiento Detallado por Asesor (Mes Actual)")
     tabla_asesores = (
@@ -262,13 +272,7 @@ elif menu == "📱 Registrar Venta de Crédito Payjoy":
         .strip()
         .title()
     )
-    equipo_financiado = (
-        st.text_input(
-            "Referencia del Celular Financiado (Ej: Samsung Galaxy A54)"
-        )
-        .strip()
-        .title()
-    )
+    marca_celular = st.selectbox("Marca del Equipo Financiado", MARCAS_CELULAR)
     tipo_venta = st.selectbox("Tipo de Venta", TIPOS_VENTA)
 
     lleva_tarjeta = st.selectbox(
@@ -303,10 +307,8 @@ elif menu == "📱 Registrar Venta de Crédito Payjoy":
     submit_credito = st.form_submit_button("Registrar Venta de Crédito")
 
     if submit_credito:
-      if not nombre_cliente or not equipo_financiado:
-        st.warning(
-            "Por favor completa el nombre del cliente y el equipo financiado."
-        )
+      if not nombre_cliente:
+        st.warning("Por favor completa el nombre del cliente o celular.")
       elif lleva_tarjeta == "Sí" and cantidad_tarjetas > stock_actual:
         st.error(
             f"Stock insuficiente de tarjetas ({stock_actual} disponibles)."
@@ -319,7 +321,7 @@ elif menu == "📱 Registrar Venta de Crédito Payjoy":
         creditos.append({
             "Fecha": str(fecha_venta),
             "Cliente": nombre_cliente,
-            "Equipo Financiado": equipo_financiado,
+            "Marca de Celular": marca_celular,
             "Tipo de Venta": tipo_venta,
             "¿Lleva Tarjeta?": lleva_tarjeta,
             "Tarjeta Entregada": tarjeta_sel if lleva_tarjeta == "Sí" else "N/A",
@@ -437,17 +439,18 @@ elif menu == "📂 Historiales y Reportes":
   c1, c2 = st.columns(2)
   with c1:
     filtro_texto = st.text_input(
-        "Buscar por Cliente, Equipo o Asesor:"
+        "Buscar por Cliente o Asesor:"
     ).lower()
   with c2:
     activar_fechas = st.checkbox("Filtrar por rango de fechas")
 
   filtro_tipo_venta = "Todos"
   filtro_asesor = "Todos"
+  filtro_marca = "Todos"
   filtro_tarjeta_estado = "Todos"
 
   if sub_menu == "Créditos Payjoy Vendidos":
-    cc1, cc2, cc3 = st.columns(3)
+    cc1, cc2, cc3, cc4 = st.columns(4)
     with cc1:
       filtro_tipo_venta = st.selectbox(
           "Filtrar por Tipo de Venta:", ["Todos"] + TIPOS_VENTA
@@ -457,6 +460,10 @@ elif menu == "📂 Historiales y Reportes":
           "Filtrar por Asesor:", ["Todos"] + RESPONSABLES
       )
     with cc3:
+      filtro_marca = st.selectbox(
+          "Filtrar por Marca:", ["Todos"] + MARCAS_CELULAR
+      )
+    with cc4:
       filtro_tarjeta_estado = st.selectbox(
           "Filtrar por Tarjeta Física:", ["Todos", "Sí", "No"]
       )
@@ -483,6 +490,8 @@ elif menu == "📂 Historiales y Reportes":
         df = df[df["Tipo de Venta"] == filtro_tipo_venta]
       if filtro_asesor != "Todos" and "Asesor" in df.columns:
         df = df[df["Asesor"] == filtro_asesor]
+      if filtro_marca != "Todos" and "Marca de Celular" in df.columns:
+        df = df[df["Marca de Celular"] == filtro_marca]
       if filtro_tarjeta_estado != "Todos" and "¿Lleva Tarjeta?" in df.columns:
         df = df[df["¿Lleva Tarjeta?"] == filtro_tarjeta_estado]
 
@@ -504,6 +513,29 @@ elif menu == "📂 Historiales y Reportes":
   if sub_menu == "Créditos Payjoy Vendidos":
     st.subheader("📱 Reporte Detallado de Créditos Payjoy")
     df_res = aplicar_filtros(creditos, "Fecha")
+
+    # Gráfico de participación y aporte por marca en el reporte detallado filtrado
+    if not df_res.empty:
+      st.markdown("##### 📊 Análisis de Ventas por Marca (Según Filtros)")
+      df_marca_rep = (
+          df_res.groupby("Marca de Celular")["Cantidad"].sum().reset_index()
+      )
+      df_marca_rep["Aporte (%)"] = (
+          (df_marca_rep["Cantidad"] / df_res["Cantidad"].sum() * 100)
+          .round(2)
+          .astype(str)
+          + "%"
+      )
+      fig_marca_rep = px.bar(
+          df_marca_rep,
+          x="Marca de Celular",
+          y="Cantidad",
+          text="Aporte (%)",
+          color="Marca de Celular",
+          title="Distribución de Créditos por Marca",
+      )
+      st.plotly_chart(fig_marca_rep, use_container_width=True)
+
     st.dataframe(
         df_res if not df_res.empty else pd.DataFrame(),
         use_container_width=True,
@@ -533,12 +565,12 @@ elif menu == "📂 Historiales y Reportes":
           f_fecha = c.get("Fecha", "S/F")
           cli = c.get("Cliente", "S/C")
           t_venta = c.get("Tipo de Venta", "N/A")
-          eq = c.get("Equipo Financiado", "N/A")
+          marca = c.get("Marca de Celular", "N/A")
           asesor = c.get("Asesor", "N/A")
           lleva_t = c.get("¿Lleva Tarjeta?", "No")
           tarj = c.get("Tarjeta Entregada", "N/A")
           indices_creditos.append(
-              f"#{i} - {f_fecha} | Asesor: {asesor} | {cli} | {eq} |"
+              f"#{i} - {f_fecha} | Asesor: {asesor} | {cli} | {marca} |"
               f" {t_venta} | ¿Lleva Tarjeta?: {lleva_t}"
           )
 
@@ -591,8 +623,4 @@ elif menu == "📂 Historiales y Reportes":
       excel_data = convertir_a_excel(df_res)
       st.download_button(
           "📥 Descargar Traslados en Excel",
-          excel_data,
-          "reporte_traslados.xlsx",
-          "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-      )
-      
+     
