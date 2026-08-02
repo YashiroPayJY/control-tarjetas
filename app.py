@@ -186,7 +186,7 @@ if menu == "📊 Dashboard & Cumplimiento de Meta":
   porcentaje_cumplimiento = min(
       round((total_ventas_mes / META_MENSUAL) * 100, 2), 100.0
   )
-  promedio_diario = total_ventas_mes / dia_actual if dia_actual > 0 else 0
+  promedio_diario = (total_ventas_mes / dia_actual) if dia_actual > 0 else 0
   proyeccion_cierre = int(promedio_diario * dias_mes_total)
 
   c1, c2, c3, c4 = st.columns(4)
@@ -314,7 +314,6 @@ elif menu == "💳 Entregar Tarjeta Pendiente":
       " entregarla ahora y descontarla del inventario."
   )
 
-  # Filtrar créditos que tengan "¿Lleva Tarjeta?": "No"
   creditos_pendientes = [
       (i, c) for i, c in enumerate(creditos) if c.get("¿Lleva Tarjeta?") == "No"
   ]
@@ -349,16 +348,12 @@ elif menu == "💳 Entregar Tarjeta Pendiente":
           st.error("Stock insuficiente de esta tarjeta.")
         else:
           idx_real = int(credito_elegido.split("#")[1].split(" -")[0])
-
-          # Descontar inventario
           inventario[tarjeta_entrega] -= 1
           guardar_inventario(inventario)
 
-          # Actualizar el registro del crédito
           creditos[idx_real]["¿Lleva Tarjeta?"] = "Sí"
           creditos[idx_real]["Tarjeta Entregada"] = tarjeta_entrega
           guardar_lista("creditos", creditos)
-
           st.success(
               "¡Tarjeta entregada y stock actualizado con éxito para este"
               " cliente!"
@@ -556,11 +551,14 @@ elif menu == "📂 Historiales y Reportes":
     )
 
     if not df_res.empty:
+      excel_bytes = convertir_a_excel(df_res)
       st.download_button(
-          "📥 Descargar Créditos en Excel",
-          convertir_a_excel(df_res),
-          "reporte_creditos.xlsx",
-          "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+          label="📥 Descargar Créditos en Excel",
+          data=excel_bytes,
+          file_name="reporte_creditos.xlsx",
+          mime=(
+              "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+          ),
       )
 
     st.markdown("---")
@@ -598,8 +596,10 @@ elif menu == "📂 Historiales y Reportes":
         use_container_width=True,
     )
     if not df_res.empty:
+      excel_bytes = convertir_a_excel(df_res)
       st.download_button(
-          "📥 Descargar Entradas en Excel",
-          convertir_a_excel(df_res),
-          "reporte_entradas.xlsx",
-          "application/vnd.openxmlformats-officedocument.spreadsheetml.shee
+          label="📥 Descargar Entradas en Excel",
+          data=excel_bytes,
+          file_name="reporte_entradas.xlsx",
+          mime=(
+              "application/vnd.openxmlformats-officedoc
