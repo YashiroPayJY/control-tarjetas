@@ -27,7 +27,6 @@ def obtener_hora_colombia():
 
 
 def cargar_datos():
-  # Inventario
   inventario = {}
   if (
       os.path.exists(ARCHIVOS_DATOS["inventario"])
@@ -42,7 +41,6 @@ def cargar_datos():
     except:
       inventario = {}
 
-  # Entradas
   entradas = []
   if (
       os.path.exists(ARCHIVOS_DATOS["entradas"])
@@ -57,7 +55,6 @@ def cargar_datos():
     except:
       entradas = []
 
-  # Traslados
   traslados = []
   if (
       os.path.exists(ARCHIVOS_DATOS["traslados"])
@@ -72,7 +69,6 @@ def cargar_datos():
     except:
       traslados = []
 
-  # Entregas
   entregas = []
   if (
       os.path.exists(ARCHIVOS_DATOS["entregas"])
@@ -118,7 +114,6 @@ def convertir_a_excel(df):
 # Cargar datos
 inventario, entradas, traslados, entregas = cargar_datos()
 
-# Lista actualizada de responsables incluyendo a P Marca y A Rutero
 RESPONSABLES = [
     "Edgardo",
     "Alexandra",
@@ -139,7 +134,7 @@ es_admin = False
 password_ingresada = st.sidebar.text_input(
     "Contraseña Admin", type="password", key="pass_admin"
 )
-if password_ingresada == "admin123":  # Puedes cambiar la contraseña aquí
+if password_ingresada == "admin123":
   st.sidebar.success("Modo Admin Activo 🔓 (Permite borrar entregas)")
   es_admin = True
 elif password_ingresada:
@@ -176,7 +171,6 @@ elif menu == "Ingresar Lote (Inventario)":
     tipo_tarjeta = st.text_input(
         "Tipo / Nombre de Tarjeta (Ej: Mastercard By Payjoy)"
     ).strip()
-    # Si ingresan "suba", sugerir o normalizar a Mastercard By Payjoy
     if (
         tipo_tarjeta.lower() == "suba"
         or tipo_tarjeta.lower() == "tarjeta suba"
@@ -318,14 +312,14 @@ elif menu == "Registrar Entrega a Cliente":
           guardar_lista("entregas", entregas)
           st.success("¡Entrega registrada e inventario actualizado con éxito!")
 
-# 5. HISTORIALES, FILTROS Y EXCEL
+# 5. HISTORIALES, FILTROS, DASHBOARD Y EXCEL
 elif menu == "Historiales, Filtros y Excel":
-  st.header("📊 Historiales, Filtros y Exportación")
+  st.header("📊 Historiales, Dashboard y Reportes")
 
   sub_menu = st.radio(
       "Selecciona el historial:",
       [
-          "Entregas a Clientes (Gestión y Borrado)",
+          "Entregas a Clientes (Gestión, Dashboard y Borrado)",
           "Entradas (Llegadas)",
           "Traslados",
       ],
@@ -337,16 +331,24 @@ elif menu == "Historiales, Filtros y Excel":
   col1, col2 = st.columns(2)
   with col1:
     filtro_texto = st.text_input(
-        "Buscar por Cliente, Equipo o Asesor:"
+        "Buscar por Cliente o Equipo Financiado:"
     ).lower()
   with col2:
     activar_fechas = st.checkbox("Filtrar por rango de fechas")
 
+  # Filtros específicos para entregas
   filtro_tipo_venta = "Todos"
-  if sub_menu == "Entregas a Clientes (Gestión y Borrado)":
-    filtro_tipo_venta = st.selectbox(
-        "Filtrar por Tipo de Venta:", ["Todos"] + TIPOS_VENTA
-    )
+  filtro_asesor = "Todos"
+  if sub_menu == "Entregas a Clientes (Gestión, Dashboard y Borrado)":
+    c_v, c_a = st.columns(2)
+    with c_v:
+      filtro_tipo_venta = st.selectbox(
+          "Filtrar por Tipo de Venta:", ["Todos"] + TIPOS_VENTA
+      )
+    with c_a:
+      filtro_asesor = st.selectbox(
+          "Filtrar por Asesor:", ["Todos"] + RESPONSABLES
+      )
 
   fecha_inicio, fecha_fin = None, None
   if activar_fechas:
@@ -366,12 +368,11 @@ elif menu == "Historiales, Filtros y Excel":
       return pd.DataFrame()
     df = pd.DataFrame(lista_datos)
 
-    if (
-        sub_menu == "Entregas a Clientes (Gestión y Borrado)"
-        and filtro_tipo_venta != "Todos"
-        and "Tipo de Venta" in df.columns
-    ):
-      df = df[df["Tipo de Venta"] == filtro_tipo_venta]
+    if sub_menu == "Entregas a Clientes (Gestión, Dashboard y Borrado)":
+      if filtro_tipo_venta != "Todos" and "Tipo de Venta" in df.columns:
+        df = df[df["Tipo de Venta"] == filtro_tipo_venta]
+      if filtro_asesor != "Todos" and "Asesor" in df.columns:
+        df = df[df["Asesor"] == filtro_asesor]
 
     if filtro_texto:
       mask = df.astype(str).apply(
@@ -390,9 +391,57 @@ elif menu == "Historiales, Filtros y Excel":
     return df
 
 
-  if sub_menu == "Entregas a Clientes (Gestión y Borrado)":
-    st.subheader("👤 Registro de Entregas y Equipos Financiados")
+  if sub_menu == "Entregas a Clientes (Gestión, Dashboard y Borrado)":
+    st.subheader("📊 Dashboard de Rendimiento de Asesores")
     df_res = aplicar_filtros(entregas, "Fecha")
+
+    # --- CÁLCULO DEL DASHBOARD ---
+    total_stock_actual = sum(inventario.values())
+
+    if not df_res.empty:
+      total_entregas_filtradas = df_res["Cantidad"].sum()
+
+      # Métricas generales arriba
+      m1, m2 = st.metricas if hasattr(st, "metricas") else st.columns(2)
+      with st.columns(2)[0]:
+        st.metric(
+            label="Total Entregas en este Reporte",
+            value=int(total_entregas_filtradas),
+        )
+      with st.columns(2)[1]:
+        st.metric(
+            label="Total Tarjetas Disponibles (Stock)",
+            value=int(total_stock_actual),
+        )
+
+      st.markdown("##### 📈 Porcentaje y Entregas por Asesor")
+
+      # Agrupar por asesor para ver cuántas entregas hizo cada uno y su porcentaje
+      resumen_asesores = (
+          df_res.groupby("Asesor")["Cantidad"]
+          .sum()
+          .reset_index(name="Entregas Realizadas")
+      )
+      resumen_asesores["Porcentaje (%)"] = (
+          (
+              resumen_asesores["Entregas Realizadas"]
+              / total_entregas_filtradas
+              * 100
+          )
+          .round(2)
+          .astype(str)
+          + "%"
+      )
+
+      st.dataframe(resumen_asesores, use_container_width=True)
+    else:
+      st.info(
+          "No hay datos suficientes en los filtros actuales para generar el"
+          " dashboard."
+      )
+
+    st.markdown("---")
+    st.subheader("👤 Detalle de Entregas")
     st.dataframe(
         df_res if not df_res.empty else pd.DataFrame(),
         use_container_width=True,
@@ -401,7 +450,7 @@ elif menu == "Historiales, Filtros y Excel":
     if not df_res.empty:
       excel_data = convertir_a_excel(df_res)
       st.download_button(
-          "📥 Descargar Entregas en Excel",
+          "📥 Descargar Reporte de Entregas en Excel",
           excel_data,
           "reporte_entregas.xlsx",
           "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
@@ -418,14 +467,15 @@ elif menu == "Historiales, Filtros y Excel":
       if entregas:
         indices_entregas = []
         for i, e in enumerate(entregas):
-          f_fecha = e.get("Fecha", e.get("Fecha/Hora", "S/F"))
-          cli = e.get("Cliente", e.get("Cliente / Celular", "S/C"))
+          f_fecha = e.get("Fecha", "S/F")
+          cli = e.get("Cliente", "S/C")
           t_venta = e.get("Tipo de Venta", "N/A")
           tarj = e.get("Tarjeta", "N/A")
           cant = e.get("Cantidad", 1)
+          asesor = e.get("Asesor", "N/A")
           indices_entregas.append(
-              f"#{i} - {f_fecha} | {cli} | {t_venta} | Tarjeta: {tarj} (Cant:"
-              f" {cant})"
+              f"#{i} - {f_fecha} | Asesor: {asesor} | {cli} | {t_venta} |"
+              f" Tarjeta: {tarj} (Cant: {cant})"
           )
 
         entrega_a_borrar = st.selectbox(
@@ -485,4 +535,4 @@ elif menu == "Historiales, Filtros y Excel":
           "reporte_traslados.xlsx",
           "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         )
-          
+        
