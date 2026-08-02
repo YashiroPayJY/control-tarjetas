@@ -163,21 +163,24 @@ if menu == "📊 Dashboard & Cumplimiento de Meta":
   dia_actual = ahora.day
   dias_mes_total = calendar.monthrange(ahora.year, ahora.month)[1]
 
-  df_creditos = pd.DataFrame(creditos) if creditos else pd.DataFrame()
   total_ventas_mes = 0
-  if not df_creditos.empty and "Fecha" in df_creditos.columns:
-    df_creditos["_fecha_dt"] = pd.to_datetime(df_creditos["Fecha"])
-    df_mes_actual = df_creditos[
-        (df_creditos["_fecha_dt"].dt.month == ahora.month)
-        & (df_creditos["_fecha_dt"].dt.year == ahora.year)
-    ]
-    total_ventas_mes = (
-        int(df_mes_actual["Cantidad"].sum())
-        if not df_mes_actual.empty
-        else 0
-    )
-  else:
-    df_mes_actual = pd.DataFrame()
+  df_mes_actual = pd.DataFrame()
+
+  if creditos:
+    df_creditos = pd.DataFrame(creditos)
+    if "Fecha" in df_creditos.columns and "Cantidad" in df_creditos.columns:
+      df_creditos["_fecha_dt"] = pd.to_datetime(
+          df_creditos["Fecha"], errors="coerce"
+      )
+      df_mes_actual = df_creditos[
+          (df_creditos["_fecha_dt"].dt.month == ahora.month)
+          & (df_creditos["_fecha_dt"].dt.year == ahora.year)
+      ]
+      total_ventas_mes = (
+          int(df_mes_actual["Cantidad"].sum())
+          if not df_mes_actual.empty
+          else 0
+      )
 
   porcentaje_cumplimiento = min(
       round((total_ventas_mes / META_MENSUAL) * 100, 2), 100.0
@@ -195,7 +198,7 @@ if menu == "📊 Dashboard & Cumplimiento de Meta":
   st.progress(min(total_ventas_mes / META_MENSUAL, 1.0))
   st.markdown("---")
 
-  if not df_mes_actual.empty:
+  if not df_mes_actual.empty and "Marca de Celular" in df_mes_actual.columns:
     g1, g2 = st.columns(2)
     with g1:
       st.subheader("🥧 Participación por Asesor (% de la Meta / Ventas)")
@@ -236,7 +239,11 @@ if menu == "📊 Dashboard & Cumplimiento de Meta":
     )
     st.dataframe(tabla_asesores, use_container_width=True)
   else:
-    st.info("Aún no hay créditos registrados en el mes actual.")
+    st.info(
+        "💡 Aún no hay créditos registrados en el mes actual. Comienza a"
+        " registrar ventas en el menú lateral para ver las gráficas y"
+        " estadísticas en vivo."
+    )
 
 elif menu == "📱 Registrar Venta de Crédito Payjoy":
   st.header("📱 Registrar Nueva Venta de Crédito Payjoy")
@@ -255,7 +262,10 @@ elif menu == "📱 Registrar Venta de Crédito Payjoy":
     cantidad_tarjetas, tarjeta_sel, stock_actual = 0, None, 0
     if lleva_tarjeta == "Sí":
       if not inventario:
-        st.error("⚠️ No hay stock de tarjetas en inventario.")
+        st.error(
+            "⚠️ No hay stock de tarjetas en inventario. Ingresa un lote"
+            " primero."
+        )
       else:
         tarjeta_sel = st.selectbox(
             "Selecciona la Tarjeta a Entregar del Stock", list(inventario.keys())
@@ -299,7 +309,7 @@ elif menu == "📱 Registrar Venta de Crédito Payjoy":
 elif menu == "📦 Stock de Tarjetas (Inventario)":
   st.header("📦 Stock Actual de Tarjetas Físicas")
   if not inventario:
-    st.info("No hay tarjetas registradas.")
+    st.info("No hay tarjetas registradas en inventario.")
   else:
     st.dataframe(
         pd.DataFrame(
@@ -461,7 +471,7 @@ elif menu == "📂 Historiales y Reportes":
     st.subheader("📱 Reporte Detallado de Créditos Payjoy")
     df_res = aplicar_filtros(creditos, "Fecha")
 
-    if not df_res.empty:
+    if not df_res.empty and "Marca de Celular" in df_res.columns:
       st.markdown("##### 📊 Análisis de Ventas por Marca")
       df_marca_rep = (
           df_res.groupby("Marca de Celular")["Cantidad"].sum().reset_index()
@@ -549,5 +559,5 @@ elif menu == "📂 Historiales y Reportes":
           convertir_a_excel(df_res),
           "reporte_traslados.xlsx",
           "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        )
-        
+  )
+    
