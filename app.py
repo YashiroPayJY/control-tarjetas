@@ -21,7 +21,7 @@ ARCHIVOS_DATOS = {
 }
 
 
-# Función oficial para obtener la fecha y hora exacta de Colombia
+# Función oficial para obtener la fecha y hora de Colombia
 def obtener_hora_colombia():
   return datetime.datetime.now(ZoneInfo("America/Bogota"))
 
@@ -50,9 +50,7 @@ def cargar_datos():
   ):
     try:
       entradas = (
-          pd.read_csv(ARCHIVOS_DATOS["entradas"])
-          .dropna(how="all")
-          .to_dict("records")
+          pd.read_csv(ARCHIVOS_DATOS["entradas"]).dropna(how="all").to_dict("records")
       )
     except:
       entradas = []
@@ -80,9 +78,7 @@ def cargar_datos():
   ):
     try:
       entregas = (
-          pd.read_csv(ARCHIVOS_DATOS["entregas"])
-          .dropna(how="all")
-          .to_dict("records")
+          pd.read_csv(ARCHIVOS_DATOS["entregas"]).dropna(how="all").to_dict("records")
       )
     except:
       entregas = []
@@ -244,7 +240,7 @@ elif menu == "Traslado a Sucursal":
           guardar_lista("traslados", traslados)
           st.success("¡Traslado registrado y guardado con éxito!")
 
-# 4. REGISTRAR ENTREGA A CLIENTE
+# 4. REGISTRAR ENTREGA A CLIENTE (CON FECHA MANUAL Y SIN HORA)
 elif menu == "Registrar Entrega a Cliente":
   st.header("👤 Registrar Entrega de Tarjeta")
   if not inventario:
@@ -273,6 +269,12 @@ elif menu == "Registrar Entrega a Cliente":
           .strip()
           .title()
       )
+
+      # Campo de fecha manual para la entrega
+      fecha_entrega = st.date_input(
+          "Fecha de Entrega", value=obtener_hora_colombia().date()
+      )
+
       responsable_entrega = st.selectbox(
           "Asesor Responsable", RESPONSABLES, key="resp_entrega"
       )
@@ -287,7 +289,7 @@ elif menu == "Registrar Entrega a Cliente":
         else:
           inventario[tarjeta_sel] -= cantidad_entrega
           entregas.append({
-              "Fecha/Hora": obtener_hora_colombia().strftime("%Y-%m-%d %H:%M"),
+              "Fecha": str(fecha_entrega),
               "Cliente": nombre_cliente,
               "Tipo de Venta": tipo_venta,
               "Equipo Financiado": equipo_financiado,
@@ -373,7 +375,7 @@ elif menu == "Historiales, Filtros y Excel":
 
   if sub_menu == "Entregas a Clientes (Gestión y Borrado)":
     st.subheader("👤 Registro de Entregas y Equipos Financiados")
-    df_res = aplicar_filtros(entregas, "Fecha/Hora")
+    df_res = aplicar_filtros(entregas, "Fecha")
     st.dataframe(
         df_res if not df_res.empty else pd.DataFrame(),
         use_container_width=True,
@@ -399,13 +401,13 @@ elif menu == "Historiales, Filtros y Excel":
       if entregas:
         indices_entregas = []
         for i, e in enumerate(entregas):
-          f_hora = e.get("Fecha/Hora", "S/F")
+          f_fecha = e.get("Fecha", e.get("Fecha/Hora", "S/F"))
           cli = e.get("Cliente", e.get("Cliente / Celular", "S/C"))
           t_venta = e.get("Tipo de Venta", "N/A")
           tarj = e.get("Tarjeta", "N/A")
           cant = e.get("Cantidad", 1)
           indices_entregas.append(
-              f"#{i} - {f_hora} | {cli} | {t_venta} | Tarjeta: {tarj} (Cant:"
+              f"#{i} - {f_fecha} | {cli} | {t_venta} | Tarjeta: {tarj} (Cant:"
               f" {cant})"
           )
 
@@ -465,5 +467,5 @@ elif menu == "Historiales, Filtros y Excel":
           excel_data,
           "reporte_traslados.xlsx",
           "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        )
-        
+            )
+            
