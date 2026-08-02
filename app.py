@@ -1,4 +1,5 @@
 import datetime
+from zoneinfo import ZoneInfo
 import io
 import os
 import pandas as pd
@@ -20,10 +21,18 @@ ARCHIVOS_DATOS = {
 }
 
 
+# Función oficial para obtener la fecha y hora exacta de Colombia
+def obtener_hora_colombia():
+  return datetime.datetime.now(ZoneInfo("America/Bogota"))
+
+
 def cargar_datos():
   # Inventario
   inventario = {}
-  if os.path.exists(ARCHIVOS_DATOS["inventario"]) and os.path.getsize(ARCHIVOS_DATOS["inventario"]) > 0:
+  if (
+      os.path.exists(ARCHIVOS_DATOS["inventario"])
+      and os.path.getsize(ARCHIVOS_DATOS["inventario"]) > 0
+  ):
     try:
       df_inv = pd.read_csv(ARCHIVOS_DATOS["inventario"])
       if not df_inv.empty and "Tipo de Tarjeta" in df_inv.columns:
@@ -35,17 +44,25 @@ def cargar_datos():
 
   # Entradas
   entradas = []
-  if os.path.exists(ARCHIVOS_DATOS["entradas"]) and os.path.getsize(ARCHIVOS_DATOS["entradas"]) > 0:
+  if (
+      os.path.exists(ARCHIVOS_DATOS["entradas"])
+      and os.path.getsize(ARCHIVOS_DATOS["entradas"]) > 0
+  ):
     try:
       entradas = (
-          pd.read_csv(ARCHIVOS_DATOS["entradas"]).dropna(how="all").to_dict("records")
+          pd.read_csv(ARCHIVOS_DATOS["entradas"])
+          .dropna(how="all")
+          .to_dict("records")
       )
     except:
       entradas = []
 
   # Traslados
   traslados = []
-  if os.path.exists(ARCHIVOS_DATOS["traslados"]) and os.path.getsize(ARCHIVOS_DATOS["traslados"]) > 0:
+  if (
+      os.path.exists(ARCHIVOS_DATOS["traslados"])
+      and os.path.getsize(ARCHIVOS_DATOS["traslados"]) > 0
+  ):
     try:
       traslados = (
           pd.read_csv(ARCHIVOS_DATOS["traslados"])
@@ -57,10 +74,15 @@ def cargar_datos():
 
   # Entregas
   entregas = []
-  if os.path.exists(ARCHIVOS_DATOS["entregas"]) and os.path.getsize(ARCHIVOS_DATOS["entregas"]) > 0:
+  if (
+      os.path.exists(ARCHIVOS_DATOS["entregas"])
+      and os.path.getsize(ARCHIVOS_DATOS["entregas"]) > 0
+  ):
     try:
       entregas = (
-          pd.read_csv(ARCHIVOS_DATOS["entregas"]).dropna(how="all").to_dict("records")
+          pd.read_csv(ARCHIVOS_DATOS["entregas"])
+          .dropna(how="all")
+          .to_dict("records")
       )
     except:
       entregas = []
@@ -152,7 +174,7 @@ elif menu == "Ingresar Lote (Inventario)":
         "Cantidad de Tarjetas", min_value=1, step=1, value=1
     )
     fecha_llegada = st.date_input(
-        "Fecha de Llegada", value=datetime.date.today()
+        "Fecha de Llegada", value=obtener_hora_colombia().date()
     )
     responsable = st.selectbox(
         "Responsable de Ingreso", RESPONSABLES, key="resp_ingreso"
@@ -163,7 +185,7 @@ elif menu == "Ingresar Lote (Inventario)":
       if tipo_tarjeta:
         inventario[tipo_tarjeta] = inventario.get(tipo_tarjeta, 0) + cantidad
         entradas.append({
-            "Fecha Registro": datetime.datetime.now().strftime(
+            "Fecha Registro": obtener_hora_colombia().strftime(
                 "%Y-%m-%d %H:%M"
             ),
             "Fecha de Llegada": str(fecha_llegada),
@@ -212,9 +234,7 @@ elif menu == "Traslado a Sucursal":
         else:
           inventario[tarjeta_sel] -= cantidad_traslado
           traslados.append({
-              "Fecha/Hora": datetime.datetime.now().strftime(
-                  "%Y-%m-%d %H:%M"
-              ),
+              "Fecha/Hora": obtener_hora_colombia().strftime("%Y-%m-%d %H:%M"),
               "Tarjeta": tarjeta_sel,
               "Cantidad": cantidad_traslado,
               "Sucursal Destino": sucursal_destino,
@@ -267,9 +287,7 @@ elif menu == "Registrar Entrega a Cliente":
         else:
           inventario[tarjeta_sel] -= cantidad_entrega
           entregas.append({
-              "Fecha/Hora": datetime.datetime.now().strftime(
-                  "%Y-%m-%d %H:%M"
-              ),
+              "Fecha/Hora": obtener_hora_colombia().strftime("%Y-%m-%d %H:%M"),
               "Cliente": nombre_cliente,
               "Tipo de Venta": tipo_venta,
               "Equipo Financiado": equipo_financiado,
@@ -315,9 +333,11 @@ elif menu == "Historiales, Filtros y Excel":
   if activar_fechas:
     c1, c2 = st.columns(2)
     with c1:
-      fecha_inicio = st.date_input("Fecha inicio", datetime.date.today())
+      fecha_inicio = st.date_input(
+          "Fecha inicio", obtener_hora_colombia().date()
+      )
     with c2:
-      fecha_fin = st.date_input("Fecha fin", datetime.date.today())
+      fecha_fin = st.date_input("Fecha fin", obtener_hora_colombia().date())
 
   st.markdown("---")
 
@@ -446,4 +466,4 @@ elif menu == "Historiales, Filtros y Excel":
           "reporte_traslados.xlsx",
           "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         )
-            
+        
