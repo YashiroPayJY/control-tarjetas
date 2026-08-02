@@ -553,12 +553,10 @@ elif menu == "📂 Historiales y Reportes":
     if not df_res.empty:
       excel_bytes = convertir_a_excel(df_res)
       st.download_button(
-          label="📥 Descargar Créditos en Excel",
-          data=excel_bytes,
-          file_name="reporte_creditos.xlsx",
-          mime=(
-              "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-          ),
+          "📥 Descargar Créditos en Excel",
+          excel_bytes,
+          "reporte_creditos.xlsx",
+          "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
       )
 
     st.markdown("---")
@@ -598,8 +596,11 @@ elif menu == "📂 Historiales y Reportes":
     if not df_res.empty:
       excel_bytes = convertir_a_excel(df_res)
       st.download_button(
-          label="📥 Descargar Entradas en Excel",
-          data=excel_bytes,
-          file_name="reporte_entradas.xlsx",
-          mime=(
-              "application/vnd.openxmlformats-officedoc
+          "📥 Descargar Entradas en Excel",
+          excel_bytes,
+          "reporte_entradas.xlsx",
+          "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      )
+
+  elif sub_menu == "Traslados":
+    st.subheader("🚚 Report
