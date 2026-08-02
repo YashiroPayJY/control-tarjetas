@@ -150,6 +150,7 @@ menu = st.sidebar.selectbox(
     [
         "📊 Dashboard & Cumplimiento de Meta",
         "📱 Registrar Venta de Crédito Payjoy",
+        "💳 Entregar Tarjeta Pendiente",
         "📦 Stock de Tarjetas (Inventario)",
         "➕ Ingresar Lote de Tarjetas",
         "🚚 Traslado de Tarjetas",
@@ -256,7 +257,7 @@ elif menu == "📱 Registrar Venta de Crédito Payjoy":
     marca_celular = st.selectbox("Marca del Equipo Financiado", MARCAS_CELULAR)
     tipo_venta = st.selectbox("Tipo de Venta", TIPOS_VENTA)
     lleva_tarjeta = st.selectbox(
-        "¿Lleva Tarjeta Física (Mastercard By Payjoy)?", ["No", "Sí"]
+        "¿Lleva Tarjeta Física (Mastercard By Payjoy)?", ["Sí", "No"]
     )
 
     cantidad_tarjetas, tarjeta_sel, stock_actual = 0, None, 0
@@ -305,6 +306,64 @@ elif menu == "📱 Registrar Venta de Crédito Payjoy":
         })
         guardar_lista("creditos", creditos)
         st.success("¡Crédito Payjoy registrado con éxito!")
+
+elif menu == "💳 Entregar Tarjeta Pendiente":
+  st.header("💳 Entregar Tarjeta Física a Créditos Pendientes")
+  st.markdown(
+      "Selecciona un cliente que haya quedado sin tarjeta física para"
+      " entregarla ahora y descontarla del inventario."
+  )
+
+  # Filtrar créditos que tengan "¿Lleva Tarjeta?": "No"
+  creditos_pendientes = [
+      (i, c) for i, c in enumerate(creditos) if c.get("¿Lleva Tarjeta?") == "No"
+  ]
+
+  if not creditos_pendientes:
+    st.info("🎉 ¡Excelente! No hay créditos pendientes por entrega de tarjeta.")
+  elif not inventario:
+    st.error(
+        "⚠️ No hay stock físico de tarjetas en inventario para realizar la"
+        " entrega. Ingresa un lote primero."
+    )
+  else:
+    with st.form("form_pendiente"):
+      opciones_select = []
+      for idx, c in creditos_pendientes:
+        opciones_select.append(
+            f"#{idx} - Fecha: {c.get('Fecha')} | Cliente: {c.get('Cliente')} |"
+            f" Asesor: {c.get('Asesor')} | Equipo: {c.get('Marca de Celular')}"
+        )
+
+      credito_elegido = st.selectbox(
+          "Selecciona el Crédito Pendiente", opciones_select
+      )
+      tarjeta_entrega = st.selectbox(
+          "Selecciona la Tarjeta del Stock", list(inventario.keys())
+      )
+      stock_bodega = inventario[tarjeta_entrega]
+      st.write(f"Stock disponible de esta tarjeta: **{stock_bodega}**")
+
+      if st.form_submit_button("Confirmar Entrega de Tarjeta Pendiente"):
+        if stock_bodega < 1:
+          st.error("Stock insuficiente de esta tarjeta.")
+        else:
+          idx_real = int(credito_elegido.split("#")[1].split(" -")[0])
+
+          # Descontar inventario
+          inventario[tarjeta_entrega] -= 1
+          guardar_inventario(inventario)
+
+          # Actualizar el registro del crédito
+          creditos[idx_real]["¿Lleva Tarjeta?"] = "Sí"
+          creditos[idx_real]["Tarjeta Entregada"] = tarjeta_entrega
+          guardar_lista("creditos", creditos)
+
+          st.success(
+              "¡Tarjeta entregada y stock actualizado con éxito para este"
+              " cliente!"
+          )
+          st.rerun()
 
 elif menu == "📦 Stock de Tarjetas (Inventario)":
   st.header("📦 Stock Actual de Tarjetas Físicas")
@@ -543,21 +602,4 @@ elif menu == "📂 Historiales y Reportes":
           "📥 Descargar Entradas en Excel",
           convertir_a_excel(df_res),
           "reporte_entradas.xlsx",
-          "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-      )
-
-  elif sub_menu == "Traslados":
-    st.subheader("🚚 Reporte de Traslados de Stock")
-    df_res = aplicar_filtros(traslados, "Fecha/Hora")
-    st.dataframe(
-        df_res if not df_res.empty else pd.DataFrame(),
-        use_container_width=True,
-    )
-    if not df_res.empty:
-      st.download_button(
-          "📥 Descargar Traslados en Excel",
-          convertir_a_excel(df_res),
-          "reporte_traslados.xlsx",
-          "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-  )
-    
+          "application/vnd.openxmlformats-officedocument.spreadsheetml.shee
