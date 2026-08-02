@@ -7,12 +7,10 @@ import pandas as pd
 import plotly.express as px
 import streamlit as st
 
-# Configuración inicial de la página
 st.set_page_config(
     page_title="Control Pro - Payjoy & Créditos", page_icon="📱", layout="wide"
 )
 
-# Archivos locales de persistencia
 ARCHIVOS_DATOS = {
     "inventario": "inventario.csv",
     "entradas": "entradas.csv",
@@ -21,7 +19,6 @@ ARCHIVOS_DATOS = {
 }
 
 
-# Función oficial para obtener la fecha y hora de Colombia
 def obtener_hora_colombia():
   return datetime.datetime.now(ZoneInfo("America/Bogota"))
 
@@ -107,11 +104,9 @@ def convertir_a_excel(df):
   output = io.BytesIO()
   with pd.ExcelWriter(output, engine="xlsxwriter") as writer:
     df.to_excel(writer, index=False, sheet_name="Reporte")
-  processed_data = output.getvalue()
-  return processed_data
+  return output.getvalue()
 
 
-# Cargar datos
 inventario, entradas, traslados, creditos = cargar_datos()
 
 RESPONSABLES = [
@@ -136,19 +131,16 @@ MARCAS_CELULAR = [
 ]
 META_MENSUAL = 185
 
-# Interfaz Principal
 st.title("📱 Control Operativo Payjoy & Financiación de Celulares")
 st.markdown("---")
 
-# Control de Acceso de Administrador en la barra lateral
 st.sidebar.markdown("### 🔐 Panel de Control")
 password_ingresada = st.sidebar.text_input(
     "Contraseña Administrador", type="password", key="pass_admin"
 )
-es_admin = False
-if password_ingresada == "admin123":
+es_admin = password_ingresada == "admin123"
+if es_admin:
   st.sidebar.success("Modo Admin Activo 🔓")
-  es_admin = True
 elif password_ingresada:
   st.sidebar.error("Contraseña incorrecta")
 
@@ -165,16 +157,13 @@ menu = st.sidebar.selectbox(
     ],
 )
 
-# 0. DASHBOARD Y CUMPLIMIENTO DE META (185 CRÉDITOS)
 if menu == "📊 Dashboard & Cumplimiento de Meta":
   st.header("📈 Dashboard Gerencial - Meta Mensual de Créditos")
-
   ahora = obtener_hora_colombia()
   dia_actual = ahora.day
   dias_mes_total = calendar.monthrange(ahora.year, ahora.month)[1]
 
   df_creditos = pd.DataFrame(creditos) if creditos else pd.DataFrame()
-
   total_ventas_mes = 0
   if not df_creditos.empty and "Fecha" in df_creditos.columns:
     df_creditos["_fecha_dt"] = pd.to_datetime(df_creditos["Fecha"])
@@ -204,20 +193,14 @@ if menu == "📊 Dashboard & Cumplimiento de Meta":
 
   st.markdown("### Progreso hacia la Meta Mensual")
   st.progress(min(total_ventas_mes / META_MENSUAL, 1.0))
-
   st.markdown("---")
 
   if not df_mes_actual.empty:
     g1, g2 = st.columns(2)
-
     with g1:
       st.subheader("🥧 Participación por Asesor (% de la Meta / Ventas)")
       df_asesor = (
           df_mes_actual.groupby("Asesor")["Cantidad"].sum().reset_index()
-      )
-      df_asesor["Aporte a la Meta (%)"] = (
-          (df_asesor["Cantidad"] / META_MENSUAL * 100).round(2).astype(str)
-          + "%"
       )
       fig_pie = px.pie(
           df_asesor,
@@ -227,7 +210,6 @@ if menu == "📊 Dashboard & Cumplimiento de Meta":
           color_discrete_sequence=px.colors.sequential.Teal,
       )
       st.plotly_chart(fig_pie, use_container_width=True)
-
     with g2:
       st.subheader("📱 Participación por Marca de Celular")
       df_marca = (
@@ -236,11 +218,7 @@ if menu == "📊 Dashboard & Cumplimiento de Meta":
           .reset_index()
       )
       fig_marca = px.bar(
-          df_marca,
-          x="Marca de Celular",
-          y="Cantidad",
-          color="Marca de Celular",
-          text="Cantidad",
+          df_marca, x="Marca de Celular", y="Cantidad", color="Marca de Celular"
       )
       st.plotly_chart(fig_marca, use_container_width=True)
 
@@ -258,12 +236,8 @@ if menu == "📊 Dashboard & Cumplimiento de Meta":
     )
     st.dataframe(tabla_asesores, use_container_width=True)
   else:
-    st.info(
-        "Aún no hay créditos registrados en el mes actual para mostrar en el"
-        " dashboard."
-    )
+    st.info("Aún no hay créditos registrados en el mes actual.")
 
-# 1. REGISTRAR VENTA DE CRÉDITO PAYJOY
 elif menu == "📱 Registrar Venta de Crédito Payjoy":
   st.header("📱 Registrar Nueva Venta de Crédito Payjoy")
   with st.form("form_credito"):
@@ -278,16 +252,10 @@ elif menu == "📱 Registrar Venta de Crédito Payjoy":
         "¿Lleva Tarjeta Física (Mastercard By Payjoy)?", ["No", "Sí"]
     )
 
-    cantidad_tarjetas = 0
-    tarjeta_sel = None
-    stock_actual = 0
-
+    cantidad_tarjetas, tarjeta_sel, stock_actual = 0, None, 0
     if lleva_tarjeta == "Sí":
       if not inventario:
-        st.error(
-            "⚠️ No hay stock de tarjetas en inventario para entregar. Debes"
-            " ingresar un lote primero."
-        )
+        st.error("⚠️ No hay stock de tarjetas en inventario.")
       else:
         tarjeta_sel = st.selectbox(
             "Selecciona la Tarjeta a Entregar del Stock", list(inventario.keys())
@@ -303,9 +271,7 @@ elif menu == "📱 Registrar Venta de Crédito Payjoy":
     )
     asesor_responsable = st.selectbox("Asesor Responsable", RESPONSABLES)
 
-    submit_credito = st.form_submit_button("Registrar Venta de Crédito")
-
-    if submit_credito:
+    if st.form_submit_button("Registrar Venta de Crédito"):
       if not nombre_cliente:
         st.warning("Por favor completa el nombre del cliente o celular.")
       elif lleva_tarjeta == "Sí" and cantidad_tarjetas > stock_actual:
@@ -328,30 +294,26 @@ elif menu == "📱 Registrar Venta de Crédito Payjoy":
             "Asesor": asesor_responsable,
         })
         guardar_lista("creditos", creditos)
-        st.success(
-            "¡Crédito Payjoy registrado con éxito y sumado a la meta mensual!"
-        )
+        st.success("¡Crédito Payjoy registrado con éxito!")
 
-# 2. VER STOCK DE TARJETAS (INVENTARIO)
 elif menu == "📦 Stock de Tarjetas (Inventario)":
-  st.header("📦 Stock Actual de Tarjetas Físicas (Segundo Plano)")
+  st.header("📦 Stock Actual de Tarjetas Físicas")
   if not inventario:
-    st.info("No hay tarjetas registradas en el inventario físico.")
+    st.info("No hay tarjetas registradas.")
   else:
-    df_inv = pd.DataFrame(
-        list(inventario.items()),
-        columns=["Tipo de Tarjeta", "Cantidad Disponible en Bodega"],
+    st.dataframe(
+        pd.DataFrame(
+            list(inventario.items()),
+            columns=["Tipo de Tarjeta", "Cantidad Disponible en Bodega"],
+        ),
+        use_container_width=True,
     )
-    st.dataframe(df_inv, use_container_width=True)
 
-# 3. INGRESAR LOTE DE TARJETAS
 elif menu == "➕ Ingresar Lote de Tarjetas":
   st.header("➕ Ingresar Lote de Tarjetas Físicas")
   with st.form("form_ingreso_tarjeta"):
     tipo_tarjeta = (
-        st.text_input(
-            "Nombre de Tarjeta (Ej: Mastercard By Payjoy)"
-        )
+        st.text_input("Nombre de Tarjeta (Ej: Mastercard By Payjoy)")
         .strip()
         .title()
     )
@@ -362,9 +324,7 @@ elif menu == "➕ Ingresar Lote de Tarjetas":
         "Fecha de Llegada", value=obtener_hora_colombia().date()
     )
     responsable = st.selectbox("Responsable de Recepción", RESPONSABLES)
-    submit_lote = st.form_submit_button("Guardar Lote en Inventario")
-
-    if submit_lote:
+    if st.form_submit_button("Guardar Lote en Inventario"):
       if tipo_tarjeta:
         inventario[tipo_tarjeta] = inventario.get(tipo_tarjeta, 0) + cantidad
         entradas.append({
@@ -378,14 +338,10 @@ elif menu == "➕ Ingresar Lote de Tarjetas":
         })
         guardar_inventario(inventario)
         guardar_lista("entradas", entradas)
-        st.success(
-            f"¡Se ingresaron {cantidad} tarjetas de '{tipo_tarjeta}' al"
-            " inventario físico!"
-        )
+        st.success(f"¡Se ingresaron {cantidad} tarjetas con éxito!")
       else:
         st.warning("Por favor ingresa el nombre de la tarjeta.")
 
-# 4. TRASLADO DE TARJETAS
 elif menu == "🚚 Traslado de Tarjetas":
   st.header("🚚 Traslado de Tarjetas Físicas a Sucursales")
   if not inventario:
@@ -402,16 +358,11 @@ elif menu == "🚚 Traslado de Tarjetas":
           st.text_input("Sucursal de Destino").strip().title()
       )
       responsable_salida = st.selectbox("Responsable del Traslado", RESPONSABLES)
-      submit_traslado = st.form_submit_button("Confirmar Traslado")
-
-      if submit_traslado:
+      if st.form_submit_button("Confirmar Traslado"):
         if not sucursal_destino:
           st.warning("Indica la sucursal de destino.")
         elif cantidad_traslado > stock_actual:
-          st.error(
-              f"Stock insuficiente. Solo hay {stock_actual} unidades"
-              " disponibles."
-          )
+          st.error(f"Stock insuficiente ({stock_actual} disponibles).")
         else:
           inventario[tarjeta_sel] -= cantidad_traslado
           traslados.append({
@@ -425,16 +376,14 @@ elif menu == "🚚 Traslado de Tarjetas":
           guardar_lista("traslados", traslados)
           st.success("¡Traslado de stock registrado con éxito!")
 
-# 5. HISTORIALES Y REPORTES
 elif menu == "📂 Historiales y Reportes":
   st.header("📂 Historiales, Filtros y Exportación Excel")
-
   sub_menu = st.radio(
       "Selecciona el reporte:",
       ["Créditos Payjoy Vendidos", "Lotes de Tarjetas Ingresados", "Traslados"],
   )
-
   st.markdown("---")
+
   c1, c2 = st.columns(2)
   with c1:
     filtro_texto = st.text_input(
@@ -443,11 +392,12 @@ elif menu == "📂 Historiales y Reportes":
   with c2:
     activar_fechas = st.checkbox("Filtrar por rango de fechas")
 
-  filtro_tipo_venta = "Todos"
-  filtro_asesor = "Todos"
-  filtro_marca = "Todos"
-  filtro_tarjeta_estado = "Todos"
-
+  filtro_tipo_venta, filtro_asesor, filtro_marca, filtro_tarjeta_estado = (
+      "Todos",
+      "Todos",
+      "Todos",
+      "Todos",
+  )
   if sub_menu == "Créditos Payjoy Vendidos":
     cc1, cc2, cc3, cc4 = st.columns(4)
     with cc1:
@@ -476,7 +426,6 @@ elif menu == "📂 Historiales y Reportes":
       )
     with fc2:
       fecha_fin = st.date_input("Fecha fin", obtener_hora_colombia().date())
-
   st.markdown("---")
 
 
@@ -493,7 +442,6 @@ elif menu == "📂 Historiales y Reportes":
         df = df[df["Marca de Celular"] == filtro_marca]
       if filtro_tarjeta_estado != "Todos" and "¿Lleva Tarjeta?" in df.columns:
         df = df[df["¿Lleva Tarjeta?"] == filtro_tarjeta_estado]
-
     if filtro_texto:
       mask = df.astype(str).apply(
           lambda x: x.str.lower().str.contains(filtro_texto).any(), axis=1
@@ -514,7 +462,7 @@ elif menu == "📂 Historiales y Reportes":
     df_res = aplicar_filtros(creditos, "Fecha")
 
     if not df_res.empty:
-      st.markdown("##### 📊 Análisis de Ventas por Marca (Según Filtros)")
+      st.markdown("##### 📊 Análisis de Ventas por Marca")
       df_marca_rep = (
           df_res.groupby("Marca de Celular")["Cantidad"].sum().reset_index()
       )
@@ -530,7 +478,6 @@ elif menu == "📂 Historiales y Reportes":
           y="Cantidad",
           text="Aporte (%)",
           color="Marca de Celular",
-          title="Distribución de Créditos por Marca",
       )
       st.plotly_chart(fig_marca_rep, use_container_width=True)
 
@@ -540,61 +487,38 @@ elif menu == "📂 Historiales y Reportes":
     )
 
     if not df_res.empty:
-      excel_data = convertir_a_excel(df_res)
       st.download_button(
-          label="📥 Descargar Créditos en Excel",
-          data=excel_data,
-          file_name="reporte_creditos_payjoy.xlsx",
-          mime=(
-              "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-          ),
+          "📥 Descargar Créditos en Excel",
+          convertir_a_excel(df_res),
+          "reporte_creditos.xlsx",
+          "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
       )
 
     st.markdown("---")
     st.subheader("⚙️ Panel de Anulación de Créditos (Solo Administrador)")
     if not es_admin:
-      st.warning(
-          "🔒 Ingresa la contraseña de Administrador en la barra lateral para"
-          " anular créditos o reponer stock de tarjetas asociadas."
-      )
+      st.warning("🔒 Ingresa la contraseña de Administrador en la barra lateral.")
     else:
       if creditos:
-        indices_creditos = []
-        for i, c in enumerate(creditos):
-          f_fecha = c.get("Fecha", "S/F")
-          cli = c.get("Cliente", "S/C")
-          t_venta = c.get("Tipo de Venta", "N/A")
-          marca = c.get("Marca de Celular", "N/A")
-          asesor = c.get("Asesor", "N/A")
-          lleva_t = c.get("¿Lleva Tarjeta?", "No")
-          tarj = c.get("Tarjeta Entregada", "N/A")
-          indices_creditos.append(
-              f"#{i} - {f_fecha} | Asesor: {asesor} | {cli} | {marca} |"
-              f" {t_venta} | ¿Lleva Tarjeta?: {lleva_t}"
-          )
-
+        indices_creditos = [
+            f"#{i} - {c.get('Fecha')} | Asesor: {c.get('Asesor')} | {c.get('Cliente')} | {c.get('Marca de Celular')}"
+            for i, c in enumerate(creditos)
+        ]
         credito_a_borrar = st.selectbox(
             "Selecciona el crédito a anular", indices_creditos
         )
-        if st.button(
-            "🗑️ Anular Crédito y Devolver Tarjeta al Inventario (Si aplica)"
-        ):
+        if st.button("🗑️ Anular Crédito y Devolver Tarjeta (Si aplica)"):
           idx = int(credito_a_borrar.split("#")[1].split(" -")[0])
           item_eliminado = creditos.pop(idx)
-
-          if item_eliminado.get("¿Lleva Tarjeta?") == "Sí":
-            tarjeta_devuelta = item_eliminado.get("Tarjeta Entregada")
-            if tarjeta_devuelta and tarjeta_devuelta != "N/A":
-              inventario[tarjeta_devuelta] = (
-                  inventario.get(tarjeta_devuelta, 0) + 1
-              )
-              guardar_inventario(inventario)
-
+          if (
+              item_eliminado.get("¿Lleva Tarjeta?") == "Sí"
+              and item_eliminado.get("Tarjeta Entregada") != "N/A"
+          ):
+            tarj = item_eliminado.get("Tarjeta Entregada")
+            inventario[tarj] = inventario.get(tarj, 0) + 1
+            guardar_inventario(inventario)
           guardar_lista("creditos", creditos)
-          st.success(
-              "¡Crédito anulado con éxito y stock de tarjeta repuesto en"
-              " inventario!"
-          )
+          st.success("¡Crédito anulado con éxito!")
           st.rerun()
 
   elif sub_menu == "Lotes de Tarjetas Ingresados":
@@ -605,14 +529,11 @@ elif menu == "📂 Historiales y Reportes":
         use_container_width=True,
     )
     if not df_res.empty:
-      excel_data = convertir_a_excel(df_res)
       st.download_button(
-          label="📥 Descargar Entradas en Excel",
-          data=excel_data,
-          file_name="reporte_lotes_tarjetas.xlsx",
-          mime=(
-              "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-          ),
+          "📥 Descargar Entradas en Excel",
+          convertir_a_excel(df_res),
+          "reporte_entradas.xlsx",
+          "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
       )
 
   elif sub_menu == "Traslados":
@@ -623,8 +544,10 @@ elif menu == "📂 Historiales y Reportes":
         use_container_width=True,
     )
     if not df_res.empty:
-      excel_data = convertir_a_excel(df_res)
       st.download_button(
-          label="📥 Descargar Traslados en Excel",
-          data=excel_data,
-   
+          "📥 Descargar Traslados en Excel",
+          convertir_a_excel(df_res),
+          "reporte_traslados.xlsx",
+          "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        )
+        
