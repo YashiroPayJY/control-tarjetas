@@ -50,7 +50,9 @@ def cargar_datos():
   ):
     try:
       entradas = (
-          pd.read_csv(ARCHIVOS_DATOS["entradas"]).dropna(how="all").to_dict("records")
+          pd.read_csv(ARCHIVOS_DATOS["entradas"])
+          .dropna(how="all")
+          .to_dict("records")
       )
     except:
       entradas = []
@@ -78,7 +80,9 @@ def cargar_datos():
   ):
     try:
       entregas = (
-          pd.read_csv(ARCHIVOS_DATOS["entregas"]).dropna(how="all").to_dict("records")
+          pd.read_csv(ARCHIVOS_DATOS["entregas"])
+          .dropna(how="all")
+          .to_dict("records")
       )
     except:
       entregas = []
@@ -114,7 +118,15 @@ def convertir_a_excel(df):
 # Cargar datos
 inventario, entradas, traslados, entregas = cargar_datos()
 
-RESPONSABLES = ["Edgardo", "Alexandra", "Yeriz", "Alejandro"]
+# Lista actualizada de responsables incluyendo a P Marca y A Rutero
+RESPONSABLES = [
+    "Edgardo",
+    "Alexandra",
+    "Yeriz",
+    "Alejandro",
+    "P Marca",
+    "A Rutero",
+]
 TIPOS_VENTA = ["Venta en tienda", "Cliente agendado"]
 
 st.title("💳 Control de Inventario y Entregas")
@@ -161,11 +173,18 @@ if menu == "Ver Inventario":
 elif menu == "Ingresar Lote (Inventario)":
   st.header("➕ Ingresar Tarjetas al Inventario")
   with st.form("form_ingreso"):
-    tipo_tarjeta = (
-        st.text_input("Tipo / Nombre de Tarjeta (Ej: Visa Clásica, Mastercard)")
-        .strip()
-        .title()
-    )
+    tipo_tarjeta = st.text_input(
+        "Tipo / Nombre de Tarjeta (Ej: Mastercard By Payjoy)"
+    ).strip()
+    # Si ingresan "suba", sugerir o normalizar a Mastercard By Payjoy
+    if (
+        tipo_tarjeta.lower() == "suba"
+        or tipo_tarjeta.lower() == "tarjeta suba"
+    ):
+      tipo_tarjeta = "Mastercard By Payjoy"
+    else:
+      tipo_tarjeta = tipo_tarjeta.title()
+
     cantidad = st.number_input(
         "Cantidad de Tarjetas", min_value=1, step=1, value=1
     )
@@ -240,7 +259,7 @@ elif menu == "Traslado a Sucursal":
           guardar_lista("traslados", traslados)
           st.success("¡Traslado registrado y guardado con éxito!")
 
-# 4. REGISTRAR ENTREGA A CLIENTE (CON FECHA MANUAL Y SIN HORA)
+# 4. REGISTRAR ENTREGA A CLIENTE
 elif menu == "Registrar Entrega a Cliente":
   st.header("👤 Registrar Entrega de Tarjeta")
   if not inventario:
@@ -270,11 +289,9 @@ elif menu == "Registrar Entrega a Cliente":
           .title()
       )
 
-      # Campo de fecha manual para la entrega
       fecha_entrega = st.date_input(
           "Fecha de Entrega", value=obtener_hora_colombia().date()
       )
-
       responsable_entrega = st.selectbox(
           "Asesor Responsable", RESPONSABLES, key="resp_entrega"
       )
@@ -467,5 +484,5 @@ elif menu == "Historiales, Filtros y Excel":
           excel_data,
           "reporte_traslados.xlsx",
           "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-            )
-            
+        )
+          
