@@ -93,7 +93,7 @@ MARCAS = [
     "Tecno",
     "Realme",
 ]
-META = 185
+META = 200
 
 st.title("📱 Control Operativo Payjoy")
 st.markdown("---")
