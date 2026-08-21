@@ -449,18 +449,19 @@ elif menu == "Gestion de Asesores y Accesos (Admin)":
     elif rol_actual != "Admin":
         st.error("Acceso restringido para Administradores.")
     else:
-        st.success("Admin Activo. Registra un nuevo asesor:")
+        st.success("Admin Activo. Registra un nuevo asesor o elimina uno existente para volver a crearlo:")
         
         with st.form("form_nuevo_asesor_user", clear_on_submit=True):
+            st.subheader("➕ Crear Nuevo Asesor y Contraseña")
             nuevo_nombre = st.text_input("Nombre del Asesor (Usuario)").strip().title()
-            nueva_pass = st.text_input("Contrasena", type="password").strip()
-            nuevo_rol = st.selectbox("Rol", ["Estandar", "Admin"])
+            nueva_pass = st.text_input("Contrasena Asignada", type="password").strip()
+            nuevo_rol = st.selectbox("Rol en el Sistema", ["Estandar", "Admin"])
 
             if st.form_submit_button("Crear Asesor y Acceso"):
                 if not nuevo_nombre or not nueva_pass:
-                    st.error("Campos obligatorios.")
+                    st.error("Todos los campos son obligatorios.")
                 elif any(a["Asesor"] == nuevo_nombre for a in lista_asesores):
-                    st.warning("Ese nombre ya existe.")
+                    st.warning("Ese nombre de asesor ya existe.")
                 else:
                     lista_asesores.append({"Asesor": nuevo_nombre, "Rol": nuevo_rol, "Contrasena": nueva_pass})
                     guardar_lista("asesores", lista_asesores)
@@ -471,9 +472,4 @@ elif menu == "Gestion de Asesores y Accesos (Admin)":
                         for u in lista_usuarios:
                             if u["Usuario"] == nuevo_nombre:
                                 u["Contrasena"] = nueva_pass
-                                u["Rol"] = nuevo_rol
-                    guardar_lista("users", lista_usuarios)
-
-                    st.success("Asesor creado con exito.")
-                    st.rerun()
-
+                                u["Rol"] = nuevo_
