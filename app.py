@@ -56,7 +56,6 @@ def cargar_datos():
       else []
   )
   
-  # Usuarios por defecto si no existe el archivo (Admin inicial: Administrador / admin123)
   df_u = cargar_csv(ARCHIVOS["users"])
   if df_u.empty:
     df_u = pd.DataFrame([{
@@ -67,14 +66,24 @@ def cargar_datos():
     df_u.to_csv(ARCHIVOS["users"], index=False)
   usuarios_list = df_u.to_dict("records")
 
-  # Asesores iniciales
   df_as = cargar_csv(ARCHIVOS["asesores"])
   if df_as.empty:
-    asesores_base = ["Edgardo", "Alexandra", "Yeriz", "Alejandro", "P Marca", "A Rutero"]
-    df_as = pd.DataFrame(asesores_base, columns=["Asesor"])
+    asesores_base = [
+        {"Asesor": "Edgardo", "Rol": "Estándar", "Contrasena": "1234"},
+        {"Asesor": "Alexandra", "Rol": "Estándar", "Contrasena": "1234"},
+        {"Asesor": "Yeriz", "Rol": "Estándar", "Contrasena": "1234"},
+        {"Asesor": "Alejandro", "Rol": "Estándar", "Contrasena": "1234"},
+        {"Asesor": "P Marca", "Rol": "Estándar", "Contrasena": "1234"},
+        {"Asesor": "A Rutero", "Rol": "Estándar", "Contrasena": "1234"}
+    ]
+    df_as = pd.DataFrame(asesores_base)
     df_as.to_csv(ARCHIVOS["asesores"], index=False)
-  asesores_list = df_as["Asesor"].tolist()
-
+    for a in asesores_base:
+      if not any(u["Usuario"] == a["Asesor"] for u in usuarios_list):
+        usuarios_list.append({"Usuario": a["Asesor"], "Contrasena": a["Contrasena"], "Rol": a["Rol"]})
+    pd.DataFrame(usuarios_list).to_csv(ARCHIVOS["users"], index=False)
+  
+  asesores_list = df_as.to_dict("records")
   return inv, ent, tras, cred, usuarios_list, asesores_list
 
 
@@ -130,12 +139,10 @@ menu = st.sidebar.selectbox(
         "➕ Ingresar Lote",
         "🚚 Traslado",
         "📂 Historiales",
-        "👥 Gestión de Asesores (Admin)",
-        "🔑 Gestión de Usuarios (Admin)",
+        "👥 Gestión de Asesores y Accesos (Admin)",
     ],
 )
 
-# Definir menús protegidos
 menus_protegidos = [
     "📊 Dashboard & Cumplimiento",
     "💳 Entregar Tarjeta Pendiente",
@@ -143,8 +150,7 @@ menus_protegidos = [
     "➕ Ingresar Lote",
     "🚚 Traslado",
     "📂 Historiales",
-    "👥 Gestión de Asesores (Admin)",
-    "🔑 Gestión de Usuarios (Admin)",
+    "👥 Gestión de Asesores y Accesos (Admin)",
 ]
 
 sesion_activa = False
@@ -166,24 +172,23 @@ if menu in menus_protegidos:
     if user_obj and user_obj["Contrasena"] == pass_ingresada:
       st.session_state["usuario_actual"] = user_obj["Usuario"]
       st.session_state["rol_actual"] = user_obj["Rol"]
-      st.sidebar.success(f"¡Bienvenido {user_obj['Usuario']} ({user_obj['Rol']})!")
+      st.sidebar.success(f"¡Bienvenido {user_obj['Usuario']}!")
       st.rerun()
     else:
       st.sidebar.error("Contraseña incorrecta.")
 
-  # Verificar si ya inició sesión en la sesión actual
-  if "usuario_actual" in st.session_state and "rol_actual" in st.session_state:
-    sesion_activa = True
-    rol_actual = st.session_state["rol_actual"]
-    st.sidebar.info(f"Sesión activa: **{st.session_state['usuario_actual']}**")
-    if st.sidebar.button("🔒 Cerrar Sesión"):
-      del st.session_state["usuario_actual"]
-      del st.session_state["rol_actual"]
-      st.rerun()
+if "usuario_actual" in st.session_state:
+  sesion_activa = True
+  rol_actual = st.session_state["rol_actual"]
+  st.sidebar.markdown("---")
+  st.sidebar.info(f"👤 Activo: **{st.session_state['usuario_actual']}**\n\n📌 Rol: **{rol_actual}**")
+  if st.sidebar.button("🔒 Cerrar Sesión"):
+    del st.session_state["usuario_actual"]
+    del st.session_state["rol_actual"]
+    st.rerun()
 
-# ---------------------------------------------------------
-# 1. REGISTRAR VENTA (Libre para cualquiera)
-# ---------------------------------------------------------
+nombres_asesores_plana = [a["Asesor"] for a in lista_asesores] if lista_asesores else ["Sin Asesor"]
+
 if menu == "📱 Registrar Venta":
   st.header("📱 Registrar Venta Payjoy")
   
@@ -213,7 +218,7 @@ if menu == "📱 Registrar Venta":
       tag_dispositivo = st.text_input("Tag del Dispositivo").strip()
 
   fecha_v = st.date_input("Fecha", value=obtener_hora().date())
-  asesor = st.selectbox("Asesor", lista_asesores if lista_asesores else ["Sin Asesor"])
+  asesor = st.selectbox("Asesor", nombres_asesores_plana)
 
   if st.button("Registrar Venta", type="primary"):
     if not cliente:
@@ -244,13 +249,10 @@ if menu == "📱 Registrar Venta":
         st.success("✅ ¡Venta registrada con éxito!")
       st.rerun()
 
-# ---------------------------------------------------------
-# 2. DASHBOARD & CUMPLIMIENTO (Protegido)
-# ---------------------------------------------------------
 elif menu == "📊 Dashboard & Cumplimiento":
   st.header("📈 Dashboard Gerencial")
   if not sesion_activa:
-    st.warning("🔒 Selecciona tu usuario e ingresa tu contraseña en la barra lateral para ver la información.")
+    st.warning("🔒 Por favor, inicia sesión en la barra lateral con tu usuario y contraseña.")
   else:
     ahora = obtener_hora()
     dias_mes = calendar.monthrange(ahora.year, ahora.month)[1]
@@ -302,13 +304,10 @@ elif menu == "📊 Dashboard & Cumplimiento":
     else:
       st.info("Sin registros este mes.")
 
-# ---------------------------------------------------------
-# 3. ENTREGAR TARJETA PENDIENTE (Protegido)
-# ---------------------------------------------------------
 elif menu == "💳 Entregar Tarjeta Pendiente":
   st.header("💳 Entregar Tarjeta Pendiente")
   if not sesion_activa:
-    st.warning("🔒 Selecciona tu usuario e ingresa tu contraseña en la barra lateral para ver la información.")
+    st.warning("🔒 Por favor, inicia sesión en la barra lateral con tu usuario y contraseña.")
   else:
     pendientes = [
         (i, c) for i, c in enumerate(creditos) if c.get("¿Aprobaron Tarjeta?") == "Sí" and c.get("¿Lleva Tarjeta?") == "No"
@@ -347,13 +346,10 @@ elif menu == "💳 Entregar Tarjeta Pendiente":
             st.success("¡Tarjeta entregada con éxito!")
             st.rerun()
 
-# ---------------------------------------------------------
-# 4. STOCK (INVENTARIO) (Protegido)
-# ---------------------------------------------------------
 elif menu == "📦 Stock (Inventario)":
   st.header("📦 Stock de Tarjetas")
   if not sesion_activa:
-    st.warning("🔒 Selecciona tu usuario e ingresa tu contraseña en la barra lateral para ver la información.")
+    st.warning("🔒 Por favor, inicia sesión en la barra lateral con tu usuario y contraseña.")
   else:
     if not inventario:
       st.info("Inventario vacío.")
@@ -363,19 +359,16 @@ elif menu == "📦 Stock (Inventario)":
       )
       st.dataframe(df_i, use_container_width=True)
 
-# ---------------------------------------------------------
-# 5. INGRESAR LOTE (Protegido)
-# ---------------------------------------------------------
 elif menu == "➕ Ingresar Lote":
   st.header("➕ Ingresar Tarjetas")
   if not sesion_activa:
-    st.warning("🔒 Selecciona tu usuario e ingresa tu contraseña en la barra lateral para ver la información.")
+    st.warning("🔒 Por favor, inicia sesión en la barra lateral con tu usuario y contraseña.")
   else:
     with st.form("f_lote", clear_on_submit=True):
       t_nombre = st.text_input("Nombre de Tarjeta").strip().title()
       cant = st.number_input("Cantidad", min_value=1, step=1, value=10)
       f_lleg = st.date_input("Fecha de Llegada", value=obtener_hora().date())
-      resp = st.selectbox("Responsable", lista_asesores if lista_asesores else ["Admin"])
+      resp = st.selectbox("Responsable", nombres_asesores_plana)
 
       if st.form_submit_button("Guardar Lote"):
         if t_nombre:
@@ -393,13 +386,10 @@ elif menu == "➕ Ingresar Lote":
         else:
           st.warning("Falta el nombre de la tarjeta.")
 
-# ---------------------------------------------------------
-# 6. TRASLADO (Protegido)
-# ---------------------------------------------------------
 elif menu == "🚚 Traslado":
   st.header("🚚 Traslado a Sucursales")
   if not sesion_activa:
-    st.warning("🔒 Selecciona tu usuario e ingresa tu contraseña en la barra lateral para ver la información.")
+    st.warning("🔒 Por favor, inicia sesión en la barra lateral con tu usuario y contraseña.")
   else:
     if not inventario:
       st.warning("No hay stock para trasladar.")
@@ -410,7 +400,7 @@ elif menu == "🚚 Traslado":
         st.write(f"Stock actual: **{stock_a}**")
         cant_t = st.number_input("Cantidad", min_value=1, step=1, value=1)
         destino = st.text_input("Destino").strip().title()
-        resp_s = st.selectbox("Responsable", lista_asesores if lista_asesores else ["Admin"])
+        resp_s = st.selectbox("Responsable", nombres_asesores_plana)
 
         if st.form_submit_button("Trasladar"):
           if not destino:
@@ -430,13 +420,10 @@ elif menu == "🚚 Traslado":
             guardar_lista("tras", traslados)
             st.success("¡Traslado exitoso!")
 
-# ---------------------------------------------------------
-# 7. HISTORIALES Y REVERSIÓN (Protegido)
-# ---------------------------------------------------------
 elif menu == "📂 Historiales":
   st.header("📂 Reportes y Exportación")
   if not sesion_activa:
-    st.warning("🔒 Selecciona tu usuario e ingresa tu contraseña en la barra lateral para ver la información.")
+    st.warning("🔒 Por favor, inicia sesión en la barra lateral con tu usuario y contraseña.")
   else:
     sub = st.radio("Ver:", ["Créditos", "Entradas", "Traslados"])
     st.markdown("---")
@@ -510,44 +497,60 @@ elif menu == "📂 Historiales":
       if not df_r.empty:
         st.download_button("📥 Descargar Reporte Excel", a_excel(df_r), "traslados.xlsx")
 
-# ---------------------------------------------------------
-# 8. GESTIÓN DE ASESORES (ADMIN)
-# ---------------------------------------------------------
-elif menu == "👥 Gestión de Asesores (Admin)":
-  st.header("👥 Gestión Interna de Asesores de Tienda")
+elif menu == "👥 Gestión de Asesores y Accesos (Admin)":
+  st.header("👥 Gestión Unificada de Asesores y Contraseñas")
+  
   if not sesion_activa:
-    st.warning("🔒 Inicia sesión en la barra lateral con un usuario Administrador.")
+    st.warning("🔒 Inicia sesión en la barra lateral con tu cuenta de **Administrador** (Ej: Administrador / admin123) para gestionar los accesos.")
+    st.markdown("---")
+    st.subheader("📋 Asesores Registrados en el Sistema")
+    if lista_asesores:
+      df_as_view = pd.DataFrame(lista_asesores)[["Asesor", "Rol"]]
+      st.dataframe(df_as_view, use_container_width=True)
   elif rol_actual != "Admin":
-    st.error("⛔ Acceso restringido exclusivamente para administradores.")
+    st.error("⛔ Tu usuario actual es Estándar. Acceso restringido exclusivamente para administradores.")
   else:
-    with st.form("form_nuevo_asesor", clear_on_submit=True):
-      nuevo_as = st.text_input("Nombre del Nuevo Asesor").strip().title()
-      if st.form_submit_button("➕ Agregar Asesor"):
-        if nuevo_as:
-          if nuevo_as not in lista_asesores:
-            lista_asesores.append(nuevo_as)
-            guardar_lista("asesores", [{"Asesor": a} for a in lista_asesores])
-            st.success(f"¡Asesor '{nuevo_as}' agregado con éxito!")
-            st.rerun()
-          else:
-            st.warning("Este asesor ya se encuentra registrado.")
+    st.success("✅ Modo Administrador Activo. Al registrar un nuevo asesor, este quedará creado automáticamente en el sistema con su contraseña de acceso.")
+    
+    with st.form("form_nuevo_asesor_user", clear_on_submit=True):
+      nuevo_nombre = st.text_input("Nombre del Asesor (Nombre de Usuario)").strip().title()
+      nueva_pass = st.text_input("Contraseña Asignada", type="password").strip()
+      nuevo_rol = st.selectbox("Rol en el Sistema", ["Estándar", "Admin"])
+
+      if st.form_submit_button("➕ Registrar Asesor y Acceso"):
+        if not nuevo_nombre or not nueva_pass:
+          st.error("El nombre y la contraseña son obligatorios.")
+        elif any(a["Asesor"] == nuevo_nombre for a in lista_asesores):
+          st.warning("Ya existe un asesor/usuario con este nombre.")
         else:
-          st.error("Ingresa un nombre válido.")
+          lista_asesores.append({
+              "Asesor": nuevo_nombre,
+              "Rol": nuevo_rol,
+              "Contrasena": nueva_pass
+          })
+          guardar_lista("asesores", lista_asesores)
+
+          if not any(u["Usuario"] == nuevo_nombre for u in lista_usuarios):
+            lista_usuarios.append({
+                "Usuario": nuevo_nombre,
+                "Contrasena": nueva_pass,
+                "Rol": nuevo_rol
+            })
+          else:
+            for u in lista_usuarios:
+              if u["Usuario"] == nuevo_nombre:
+                u["Contrasena"] = nueva_pass
+                u["Rol"] = nuevo_rol
+          guardar_lista("users", lista_usuarios)
+
+          st.success(f"¡Asesor y usuario '{nuevo_nombre}' creado con éxito!")
+          st.rerun()
 
     st.markdown("---")
-    st.subheader("📋 Listado Actual de Asesores")
+    st.subheader("📋 Listado de Asesores y Roles Actuales")
     if lista_asesores:
-      st.dataframe(pd.DataFrame(lista_asesores, columns=["Asesor"]), use_container_width=True)
-      
-      del_as = st.selectbox("Seleccionar Asesor a Eliminar", lista_asesores)
-      if st.button("🗑️ Eliminar Asesor"):
-        lista_asesores.remove(del_as)
-        guardar_lista("asesores", [{"Asesor": a} for a in lista_asesores])
-        st.success("Asesor eliminado.")
-        st.rerun()
-    else:
-      st.info("No hay asesores registrados.")
+      df_view_asesores = pd.DataFrame(lista_asesores)[["Asesor", "Rol"]]
+      st.dataframe(df_view_asesores, use_container_width=True)
 
-# ---------------------------------------------------------
-# 9. GESTIÓN DE USUARIOS (ADMIN)
-# ----------------------------------------
+      nombres_borrar = [a["Asesor"] for a in lista_asesores if a["Asesor"] != "Administrador"]
+      if no
