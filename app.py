@@ -56,7 +56,7 @@ def cargar_datos():
       else []
   )
   
-  # Usuarios por defecto si no existe el archivo (Admin inicial: admin / admin123)
+  # Usuarios por defecto si no existe el archivo (Admin inicial: Administrador / admin123)
   df_u = cargar_csv(ARCHIVOS["users"])
   if df_u.empty:
     df_u = pd.DataFrame([{
@@ -155,22 +155,21 @@ if menu in menus_protegidos:
   st.sidebar.markdown("### 🔐 Autenticación de Usuario")
   
   if not lista_usuarios:
-    st.sidebar.error("No hay usuarios creados.")
-  else:
-    nombres_u = [u["Usuario"] for u in lista_usuarios]
-    user_sel = st.sidebar.selectbox("Selecciona tu Usuario", nombres_u)
-    pass_ingresada = st.sidebar.text_input("Contraseña", type="password")
+    lista_usuarios = [{"Usuario": "Administrador", "Contrasena": "admin123", "Rol": "Admin"}]
 
-    if st.sidebar.button("🔓 Iniciar Sesión"):
-      # Buscar usuario
-      user_obj = next((u for u in lista_usuarios if u["Usuario"] == user_sel), None)
-      if user_obj and user_obj["Contrasena"] == pass_ingresada:
-        st.session_state["usuario_actual"] = user_obj["Usuario"]
-        st.session_state["rol_actual"] = user_obj["Rol"]
-        st.sidebar.success(f"¡Bienvenido {user_obj['Usuario']} ({user_obj['Rol']})!")
-        st.rerun()
-      else:
-        st.sidebar.error("Contraseña incorrecta.")
+  nombres_u = [u["Usuario"] for u in lista_usuarios]
+  user_sel = st.sidebar.selectbox("Selecciona tu Usuario", nombres_u)
+  pass_ingresada = st.sidebar.text_input("Contraseña", type="password")
+
+  if st.sidebar.button("🔓 Iniciar Sesión"):
+    user_obj = next((u for u in lista_usuarios if u["Usuario"] == user_sel), None)
+    if user_obj and user_obj["Contrasena"] == pass_ingresada:
+      st.session_state["usuario_actual"] = user_obj["Usuario"]
+      st.session_state["rol_actual"] = user_obj["Rol"]
+      st.sidebar.success(f"¡Bienvenido {user_obj['Usuario']} ({user_obj['Rol']})!")
+      st.rerun()
+    else:
+      st.sidebar.error("Contraseña incorrecta.")
 
   # Verificar si ya inició sesión en la sesión actual
   if "usuario_actual" in st.session_state and "rol_actual" in st.session_state:
@@ -304,7 +303,7 @@ elif menu == "📊 Dashboard & Cumplimiento":
       st.info("Sin registros este mes.")
 
 # ---------------------------------------------------------
-# 3. ENTREGAR TARJETA PENDIENTE (Protegido - Estándar y Admin)
+# 3. ENTREGAR TARJETA PENDIENTE (Protegido)
 # ---------------------------------------------------------
 elif menu == "💳 Entregar Tarjeta Pendiente":
   st.header("💳 Entregar Tarjeta Pendiente")
@@ -488,7 +487,6 @@ elif menu == "📂 Historiales":
         if st.button("🗑️ Anular / Revertir Crédito", type="primary"):
           idx = int(a_borrar.split("#")[1].split(" -")[0])
           item = creditos.pop(idx)
-          # Si había llevado tarjeta física, devolverla al inventario
           if (
               item.get("¿Lleva Tarjeta?") == "Sí"
               and item.get("Tarjeta Entregada") != "N/A"
@@ -518,7 +516,7 @@ elif menu == "📂 Historiales":
 elif menu == "👥 Gestión de Asesores (Admin)":
   st.header("👥 Gestión Interna de Asesores de Tienda")
   if not sesion_activa:
-    st.warning("🔒 Inicia sesión en la barra lateral.")
+    st.warning("🔒 Inicia sesión en la barra lateral con un usuario Administrador.")
   elif rol_actual != "Admin":
     st.error("⛔ Acceso restringido exclusivamente para administradores.")
   else:
@@ -551,4 +549,5 @@ elif menu == "👥 Gestión de Asesores (Admin)":
       st.info("No hay asesores registrados.")
 
 # ---------------------------------------------------------
-# 9. GESTIÓN D
+# 9. GESTIÓN DE USUARIOS (ADMIN)
+# ----------------------------------------
