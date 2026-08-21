@@ -175,59 +175,62 @@ if menu == "📊 Dashboard & Cumplimiento":
 
 elif menu == "📱 Registrar Venta":
   st.header("📱 Registrar Venta Payjoy")
-  with st.form("f_venta", clear_on_submit=True):
-    cliente = st.text_input("Nombre del Cliente").strip().title()
-    marca = st.selectbox("Marca", MARCAS)
-    tipo = st.selectbox("Tipo de Venta", TIPOS_VENTA)
-    
-    aprobaron_tarjeta = st.selectbox("¿Le aprobaron tarjeta?", ["Sí", "No"])
-    
-    lleva_t = "No"
-    tarj_sel = None
-    cant_t = 0
-    stock_act = 0
-    tag_dispositivo = "N/A"
+  
+  # Campos fuera del form para permitir interactividad dinámica en tiempo real
+  cliente = st.text_input("Nombre del Cliente").strip().title()
+  marca = st.selectbox("Marca", MARCAS)
+  tipo = st.selectbox("Tipo de Venta", TIPOS_VENTA)
+  
+  aprobaron_tarjeta = st.selectbox("¿Le aprobaron tarjeta?", ["Sí", "No"])
+  
+  lleva_t = "No"
+  tarj_sel = None
+  cant_t = 0
+  stock_act = 0
+  tag_dispositivo = "N/A"
 
-    if aprobaron_tarjeta == "Sí":
-      lleva_t = st.selectbox("¿Lleva Tarjeta Física?", ["Sí", "No"])
-      if lleva_t == "Sí":
-        if not inventario:
-          st.error("No hay tarjetas en stock.")
-        else:
-          tarj_sel = st.selectbox("Tarjeta a Entregar", list(inventario.keys()))
-          stock_act = inventario[tarj_sel]
-          st.write(f"Stock: **{stock_act}**")
-          cant_t = st.number_input("Cantidad", min_value=1, step=1, value=1)
-        
-        tag_dispositivo = st.text_input("Tag del Dispositivo").strip()
-
-    fecha_v = st.date_input("Fecha", value=obtener_hora().date())
-    asesor = st.selectbox("Asesor", ASESORES)
-
-    if st.form_submit_button("Registrar"):
-      if not cliente:
-        st.warning("Falta el nombre del cliente.")
-      elif aprobaron_tarjeta == "Sí" and lleva_t == "Sí" and cant_t > stock_act:
-        st.error("Stock insuficiente.")
+  if aprobaron_tarjeta == "Sí":
+    lleva_t = st.selectbox("¿Lleva Tarjeta Física?", ["Sí", "No"])
+    if lleva_t == "Sí":
+      if not inventario:
+        st.error("No hay tarjetas en stock.")
       else:
-        if aprobaron_tarjeta == "Sí" and lleva_t == "Sí" and tarj_sel:
-          inventario[tarj_sel] -= cant_t
-          guardar_inv(inventario)
+        tarj_sel = st.selectbox("Tarjeta a Entregar", list(inventario.keys()))
+        stock_act = inventario[tarj_sel]
+        st.write(f"Stock actual: **{stock_act}**")
+        cant_t = st.number_input("Cantidad", min_value=1, step=1, value=1)
+      
+      # Este campo ahora solo se muestra si lleva_t == "Sí" de forma interactiva
+      tag_dispositivo = st.text_input("Tag del Dispositivo").strip()
 
-        creditos.append({
-            "Fecha": str(fecha_v),
-            "Cliente": cliente,
-            "Marca de Celular": marca,
-            "Tipo de Venta": tipo,
-            "¿Aprobaron Tarjeta?": aprobaron_tarjeta,
-            "¿Lleva Tarjeta?": lleva_t,
-            "Tarjeta Entregada": tarj_sel if (aprobaron_tarjeta == "Sí" and lleva_t == "Sí") else "N/A",
-            "Tag Dispositivo": tag_dispositivo if (aprobaron_tarjeta == "Sí" and lleva_t == "Sí") else "N/A",
-            "Cantidad": 1,
-            "Asesor": asesor,
-        })
-        guardar_lista("cred", creditos)
-        st.success("¡Registrado con éxito! El formulario está listo para otro.")
+  fecha_v = st.date_input("Fecha", value=obtener_hora().date())
+  asesor = st.selectbox("Asesor", ASESORES)
+
+  if st.button("Registrar Venta", type="primary"):
+    if not cliente:
+      st.warning("⚠️ Falta el nombre del cliente.")
+    elif aprobaron_tarjeta == "Sí" and lleva_t == "Sí" and cant_t > stock_act:
+      st.error("⚠️ Stock insuficiente para la cantidad seleccionada.")
+    else:
+      if aprobaron_tarjeta == "Sí" and lleva_t == "Sí" and tarj_sel:
+        inventario[tarj_sel] -= cant_t
+        guardar_inv(inventario)
+
+      creditos.append({
+          "Fecha": str(fecha_v),
+          "Cliente": cliente,
+          "Marca de Celular": marca,
+          "Tipo de Venta": tipo,
+          "¿Aprobaron Tarjeta?": aprobaron_tarjeta,
+          "¿Lleva Tarjeta?": lleva_t,
+          "Tarjeta Entregada": tarj_sel if (aprobaron_tarjeta == "Sí" and lleva_t == "Sí") else "N/A",
+          "Tag Dispositivo": tag_dispositivo if (aprobaron_tarjeta == "Sí" and lleva_t == "Sí" and tag_dispositivo) else "N/A",
+          "Cantidad": 1,
+          "Asesor": asesor,
+      })
+      guardar_lista("cred", creditos)
+      st.success("✅ ¡Venta registrada con éxito!")
+      st.rerun()
 
 elif menu == "💳 Entregar Tarjeta Pendiente":
   st.header("💳 Entregar Tarjeta Pendiente")
@@ -406,4 +409,3 @@ elif menu == "📂 Historiales":
     st.dataframe(df_r, use_container_width=True)
     if not df_r.empty:
       st.download_button("📥 Excel", a_excel(df_r), "traslados.xlsx")
-                             
