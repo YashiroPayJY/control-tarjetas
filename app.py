@@ -41,14 +41,12 @@ def cargar_datos():
     tras = cargar_csv(ARCHIVOS["tras"]).to_dict("records") if not cargar_csv(ARCHIVOS["tras"]).empty else []
     cred = cargar_csv(ARCHIVOS["cred"]).to_dict("records") if not cargar_csv(ARCHIVOS["cred"]).empty else []
     
-    # Cargar usuarios
     df_u = cargar_csv(ARCHIVOS["users"])
     if df_u.empty or "Usuario" not in df_u.columns:
         df_u = pd.DataFrame([{"Usuario": "Administrador", "Contrasena": "admin123", "Rol": "Admin"}])
         df_u.to_csv(ARCHIVOS["users"], index=False)
     usuarios_list = df_u.to_dict("records")
 
-    # Cargar asesores con blindaje total ante archivos viejos
     df_as = cargar_csv(ARCHIVOS["asesores"])
     asesores_base = [
         {"Asesor": "Edgardo", "Rol": "Estandar", "Contrasena": "1234"},
@@ -63,18 +61,15 @@ def cargar_datos():
         df_as = pd.DataFrame(asesores_base)
         df_as.to_csv(ARCHIVOS["asesores"], index=False)
     else:
-        # Si el archivo viejo tiene las columnas con nombres distintos o incompletos, los normalizamos
         if "Rol" not in df_as.columns:
             df_as["Rol"] = "Estandar"
         if "Contrasena" not in df_as.columns:
             df_as["Contrasena"] = "1234"
-        # Si tenía nombres viejos en otra columna
         if "Nombre" in df_as.columns and "Asesor" not in df_as.columns:
             df_as["Asesor"] = df_as["Nombre"]
 
     asesores_list = df_as.to_dict("records")
 
-    # Sincronizar usuarios
     for a in asesores_list:
         nombre_a = a.get("Asesor")
         if nombre_a and not any(u.get("Usuario") == nombre_a for u in usuarios_list):
@@ -113,7 +108,7 @@ st.markdown("---")
 
 st.sidebar.markdown("### Menu Principal")
 menu = st.sidebar.selectbox(
-    "Selecciona una opcion",
+    "Selecciona opcion",
     [
         "Registrar Venta",
         "Dashboard y Cumplimiento",
@@ -122,7 +117,7 @@ menu = st.sidebar.selectbox(
         "Ingresar Lote",
         "Traslado",
         "Historiales",
-        "Gestion de Asesores y Accesos (Admin)"
+        "Gestion Asesores"
     ]
 )
 
@@ -133,7 +128,7 @@ menus_protegidos = [
     "Ingresar Lote",
     "Traslado",
     "Historiales",
-    "Gestion de Asesores y Accesos (Admin)"
+    "Gestion Asesores"
 ]
 
 sesion_activa = False
@@ -147,25 +142,25 @@ if menu in menus_protegidos:
         lista_usuarios = [{"Usuario": "Administrador", "Contrasena": "admin123", "Rol": "Admin"}]
 
     nombres_u = [u["Usuario"] for u in lista_usuarios]
-    user_sel = st.sidebar.selectbox("Selecciona Usuario", nombres_u)
+    user_sel = st.sidebar.selectbox("Usuario", nombres_u)
     pass_ingresada = st.sidebar.text_input("Contrasena", type="password")
 
-    if st.sidebar.button("Iniciar Sesion"):
+    if st.sidebar.button("Ingresar"):
         user_obj = next((u for u in lista_usuarios if u["Usuario"] == user_sel), None)
         if user_obj and user_obj["Contrasena"] == pass_ingresada:
             st.session_state["usuario_actual"] = user_obj["Usuario"]
             st.session_state["rol_actual"] = user_obj["Rol"]
-            st.sidebar.success("Bienvenido " + user_obj["Usuario"])
+            st.sidebar.success("Bienvenido")
             st.rerun()
         else:
-            st.sidebar.error("Contrasena incorrecta")
+            st.sidebar.error("Error")
 
 if "usuario_actual" in st.session_state:
     sesion_activa = True
     rol_actual = st.session_state["rol_actual"]
     st.sidebar.markdown("---")
     st.sidebar.info("Activo: " + st.session_state["usuario_actual"] + " | Rol: " + rol_actual)
-    if st.sidebar.button("Cerrar Sesion"):
+    if st.sidebar.button("Salir"):
         del st.session_state["usuario_actual"]
         del st.session_state["rol_actual"]
         st.rerun()
@@ -190,11 +185,11 @@ if menu == "Registrar Venta":
         lleva_t = st.selectbox("Lleva Tarjeta Fisica?", ["Si", "No"])
         if lleva_t == "Si":
             if not inventario:
-                st.error("No hay tarjetas en stock.")
+                st.error("No hay stock.")
             else:
-                tarj_sel = st.selectbox("Tarjeta a Entregar", list(inventario.keys()))
+                tarj_sel = st.selectbox("Tarjeta", list(inventario.keys()))
                 stock_act = inventario[tarj_sel]
-                st.write("Stock actual: " + str(stock_act))
+                st.write("Stock: " + str(stock_act))
                 cant_t = st.number_input("Cantidad", min_value=1, step=1, value=1)
             tag_dispositivo = st.text_input("Tag del Dispositivo").strip()
 
@@ -203,7 +198,7 @@ if menu == "Registrar Venta":
 
     if st.button("Registrar", type="primary"):
         if not cliente:
-            st.warning("Falta el nombre del cliente.")
+            st.warning("Falta el cliente.")
         elif aprobaron_tarjeta == "Si" and lleva_t == "Si" and cant_t > stock_act:
             st.error("Stock insuficiente.")
         else:
@@ -225,15 +220,15 @@ if menu == "Registrar Venta":
             })
             guardar_lista("cred", cred)
             if aprobaron_tarjeta == "Si" and lleva_t == "No":
-                st.success("Venta registrada. Quedo guardada en Pendientes de Entrega.")
+                st.success("Guardado en Pendientes.")
             else:
-                st.success("Venta registrada con exito.")
+                st.success("Registrado con exito.")
             st.rerun()
 
 elif menu == "Dashboard y Cumplimiento":
     st.header("Dashboard Gerencial")
     if not sesion_activa:
-        st.warning("Inicia sesion en la barra lateral.")
+        st.warning("Inicia sesion.")
     else:
         ahora = obtener_hora()
         dias_mes = calendar.monthrange(ahora.year, ahora.month)[1]
@@ -283,31 +278,31 @@ elif menu == "Dashboard y Cumplimiento":
 elif menu == "Entregar Tarjeta Pendiente":
     st.header("Entregar Tarjeta Pendiente")
     if not sesion_activa:
-        st.warning("Inicia sesion en la barra lateral.")
+        st.warning("Inicia sesion.")
     else:
         pendientes = [(i, c) for i, c in enumerate(cred) if c.get("Aprobaron Tarjeta") == "Si" and c.get("Lleva Tarjeta") == "No"]
 
         if not pendientes:
-            st.info("No hay creditos pendientes de tarjeta fisica.")
+            st.info("No hay pendientes.")
         elif not inventario:
-            st.error("No hay stock en inventario.")
+            st.error("Inventario vacio.")
         else:
             with st.form("f_pend", clear_on_submit=True):
                 ops = []
                 for i, c in pendientes:
-                    ops.append("#" + str(i) + " - Cliente: " + str(c.get('Cliente')) + " - Asesor: " + str(c.get('Asesor')))
+                    ops.append("#" + str(i) + " - " + str(c.get('Cliente')))
 
-                elegido = st.selectbox("Credito Pendiente", ops)
-                t_ent = st.selectbox("Tarjeta a Asignar", list(inventario.keys()))
+                elegido = st.selectbox("Pendiente", ops)
+                t_ent = st.selectbox("Tarjeta", list(inventario.keys()))
                 stock_b = inventario[t_ent]
-                st.write("Stock disponible: " + str(stock_b))
-                tag_pend = st.text_input("Tag del Dispositivo").strip()
+                st.write("Stock: " + str(stock_b))
+                tag_pend = st.text_input("Tag Dispositivo").strip()
 
-                if st.form_submit_button("Confirmar Entrega"):
+                if st.form_submit_button("Confirmar"):
                     if stock_b < 1:
-                        st.error("Stock insuficiente.")
+                        st.error("Sin stock.")
                     else:
-                        idx = int(elegido.split("#")[1].split(" -")[0])
+                        idx = int(elegido.split("#")[1].split(" ")[0])
                         inventario[t_ent] -= 1
                         guardar_inv(inventario)
                         cred[idx]["Lleva Tarjeta"] = "Si"
@@ -315,16 +310,16 @@ elif menu == "Entregar Tarjeta Pendiente":
                         if tag_pend:
                             cred[idx]["Tag Dispositivo"] = tag_pend
                         guardar_lista("cred", cred)
-                        st.success("Tarjeta entregada con exito.")
+                        st.success("Entregado.")
                         st.rerun()
 
 elif menu == "Stock (Inventario)":
     st.header("Stock de Tarjetas")
     if not sesion_activa:
-        st.warning("Inicia sesion en la barra lateral.")
+        st.warning("Inicia sesion.")
     else:
         if not inventario:
-            st.info("Inventario vacio.")
+            st.info("Vacio.")
         else:
             df_i = pd.DataFrame(list(inventario.items()), columns=["Tarjeta", "Cantidad"])
             st.dataframe(df_i, use_container_width=True)
@@ -332,15 +327,15 @@ elif menu == "Stock (Inventario)":
 elif menu == "Ingresar Lote":
     st.header("Ingresar Tarjetas")
     if not sesion_activa:
-        st.warning("Inicia sesion en la barra lateral.")
+        st.warning("Inicia sesion.")
     else:
         with st.form("f_lote", clear_on_submit=True):
-            t_nombre = st.text_input("Nombre de Tarjeta").strip().title()
+            t_nombre = st.text_input("Nombre").strip().title()
             cant = st.number_input("Cantidad", min_value=1, step=1, value=10)
-            f_lleg = st.date_input("Fecha de Llegada", value=obtener_hora().date())
+            f_lleg = st.date_input("Fecha", value=obtener_hora().date())
             resp = st.selectbox("Responsable", nombres_asesores_plana)
 
-            if st.form_submit_button("Guardar Lote"):
+            if st.form_submit_button("Guardar"):
                 if t_nombre:
                     inventario[t_nombre] = inventario.get(t_nombre, 0) + cant
                     entradas.append({
@@ -352,26 +347,26 @@ elif menu == "Ingresar Lote":
                     })
                     guardar_inv(inventario)
                     guardar_lista("ent", entradas)
-                    st.success("Lote ingresado correctamente.")
+                    st.success("Ingresado.")
                 else:
-                    st.warning("Falta el nombre.")
+                    st.warning("Falta nombre.")
 
 elif menu == "Traslado":
-    st.header("Traslado a Sucursales")
+    st.header("Traslado")
     if not sesion_activa:
-        st.warning("Inicia sesion en la barra lateral.")
+        st.warning("Inicia sesion.")
     else:
         with st.form("f_tras", clear_on_submit=True):
             t_sel = st.selectbox("Tarjeta", list(inventario.keys()))
             stock_a = inventario[t_sel]
-            st.write("Stock actual: " + str(stock_a))
+            st.write("Stock: " + str(stock_a))
             cant_t = st.number_input("Cantidad", min_value=1, step=1, value=1)
             destino = st.text_input("Destino").strip().title()
             resp_s = st.selectbox("Responsable", nombres_asesores_plana)
 
             if st.form_submit_button("Trasladar"):
                 if not destino:
-                    st.warning("Indica el destino.")
+                    st.warning("Indica destino.")
                 elif cant_t > stock_a:
                     st.error("Stock insuficiente.")
                 else:
@@ -388,97 +383,102 @@ elif menu == "Traslado":
                     st.success("Traslado exitoso.")
 
 elif menu == "Historiales":
-    st.header("Reportes y Exportacion")
+    st.header("Historiales")
     if not sesion_activa:
-        st.warning("Inicia sesion en la barra lateral.")
+        st.warning("Inicia sesion.")
     else:
         sub = st.radio("Ver:", ["Creditos", "Entradas", "Traslados"])
         st.markdown("---")
 
-        col1, col2 = st.columns(2)
-        with col1:
-            f_txt = st.text_input("Buscar texto:").lower()
-        with col2:
-            activar_f = st.checkbox("Filtrar por fechas")
-
-        f_ini, f_fin = None, None
-        if activar_f:
-            c1, c2 = st.columns(2)
-            with c1:
-                f_ini = st.date_input("Inicio", obtener_hora().date())
-            with c2:
-                f_fin = st.date_input("Fin", obtener_hora().date())
-
-        def procesar_df(lista, col_fecha):
-            if not lista:
-                return pd.DataFrame()
-            df = pd.DataFrame(lista)
-            if f_txt:
-                mask = df.astype(str).apply(lambda x: x.str.lower().str.contains(f_txt).any(), axis=1)
-                df = df[mask]
-            if activar_f and col_fecha in df.columns:
-                df["_t"] = pd.to_datetime(df[col_fecha]).dt.date
-                df = df[(df["_t"] >= f_ini) & (df["_t"] <= f_fin)].drop(columns=["_t"])
-            return df
-
         if sub == "Creditos":
-            df_r = procesar_df(cred, "Fecha")
+            df_r = pd.DataFrame(cred) if cred else pd.DataFrame()
             st.dataframe(df_r, use_container_width=True)
             if not df_r.empty:
-                st.download_button("Descargar Excel", a_excel(df_r), "creditos.xlsx")
+                st.download_button("Excel", a_excel(df_r), "creditos.xlsx")
 
-            st.markdown("---")
-            st.subheader("Anulacion de Creditos")
-            if rol_actual != "Admin":
-                st.warning("Solo los Admin pueden anular creditos.")
-            elif cred:
-                ops = ["#" + str(i) + " - Cliente: " + str(c.get('Cliente')) for i, c in enumerate(cred)]
-                a_borrar = st.selectbox("Seleccione credito:", ops)
-                if st.button("Anular Credito", type="primary"):
-                    idx = int(a_borrar.split("#")[1].split(" -")[0])
+            if rol_actual == "Admin" and cred:
+                st.markdown("---")
+                ops = ["#" + str(i) + " - " + str(c.get('Cliente')) for i, c in enumerate(cred)]
+                a_borrar = st.selectbox("Anular credito:", ops)
+                if st.button("Anular", type="primary"):
+                    idx = int(a_borrar.split("#")[1].split(" ")[0])
                     item = cred.pop(idx)
                     if item.get("Lleva Tarjeta") == "Si" and item.get("Tarjeta Entregada") != "N/A":
                         t = item.get("Tarjeta Entregada")
                         inventario[t] = inventario.get(t, 0) + 1
                         guardar_inv(inventario)
                     guardar_lista("cred", cred)
-                    st.success("Credito anulado.")
+                    st.success("Anulado.")
                     st.rerun()
 
         elif sub == "Entradas":
-            df_r = procesar_df(entradas, "Fecha de Llegada")
+            df_r = pd.DataFrame(entradas) if entradas else pd.DataFrame()
             st.dataframe(df_r, use_container_width=True)
             if not df_r.empty:
-                st.download_button("Descargar Excel", a_excel(df_r), "entradas.xlsx")
+                st.download_button("Excel", a_excel(df_r), "entradas.xlsx")
 
         elif sub == "Traslados":
-            df_r = procesar_df(traslados, "Fecha/Hora")
+            df_r = pd.DataFrame(traslados) if traslados else pd.DataFrame()
             st.dataframe(df_r, use_container_width=True)
             if not df_r.empty:
-                st.download_button("Descargar Excel", a_excel(df_r), "traslados.xlsx")
+                st.download_button("Excel", a_excel(df_r), "traslados.xlsx")
 
-elif menu == "Gestion de Asesores y Accesos (Admin)":
-    st.header("Gestion de Asesores y Contrasenas")
+elif menu == "Gestion Asesores":
+    st.header("Gestion Asesores y Accesos")
     
-    if not sesion_activa:
-        st.warning("Inicia sesion como Administrador en la barra lateral.")
+    if not sesion_activa or rol_actual != "Admin":
+        st.error("Acceso exclusivo para Administradores.")
+    else:
+        st.success("Admin Activo")
+        
+        with st.form("form_nuevo_asesor_user", clear_on_submit=True):
+            st.subheader("Crear Asesor")
+            nuevo_nombre = st.text_input("Nombre Usuario").strip().title()
+            nueva_pass = st.text_input("Contrasena", type="password").strip()
+            nuevo_rol = st.selectbox("Rol", ["Estandar", "Admin"])
+
+            if st.form_submit_button("Crear"):
+                if not nuevo_nombre or not nueva_pass:
+                    st.error("Campos obligatorios.")
+                elif any(str(a.get("Asesor")) == nuevo_nombre for a in lista_asesores):
+                    st.warning("Ya existe.")
+                else:
+                    lista_asesores.append({"Asesor": nuevo_nombre, "Rol": nuevo_rol, "Contrasena": nueva_pass})
+                    guardar_lista("asesores", lista_asesores)
+
+                    if not any(u.get("Usuario") == nuevo_nombre for u in lista_usuarios):
+                        lista_usuarios.append({"Usuario": nuevo_nombre, "Contrasena": nueva_pass, "Rol": nuevo_rol})
+                    else:
+                        for u in lista_usuarios:
+                            if u.get("Usuario") == nuevo_nombre:
+                                u["Contrasena"] = nueva_pass
+                                u["Rol"] = nuevo_rol
+                    guardar_lista("users", lista_usuarios)
+
+                    st.success("Creado con exito.")
+                    st.rerun()
+
         st.markdown("---")
-        st.subheader("Asesores Actuales")
+        st.subheader("Eliminar Asesor")
         if lista_asesores:
             df_temp = pd.DataFrame(lista_asesores)
             cols_mostrar = [c for c in ["Asesor", "Rol"] if c in df_temp.columns]
             st.dataframe(df_temp[cols_mostrar], use_container_width=True)
-    elif rol_actual != "Admin":
-        st.error("Acceso restringido para Administradores.")
-    else:
-        st.success("Admin Activo. Registra un nuevo asesor o elimina uno existente:")
-        
-        with st.form("form_nuevo_asesor_user", clear_on_submit=True):
-            st.subheader("➕ Crear Nuevo Asesor y Contraseña")
-            nuevo_nombre = st.text_input("Nombre del Asesor (Usuario)").strip().title()
-            nueva_pass = st.text_input("Contrasena Asignada", type="password").strip()
-            nuevo_rol = st.selectbox("Rol en el Sistema", ["Estandar", "Admin"])
 
-            if st.form_submit_button("Crear Asesor y Acceso"):
-                if not nuevo_nombre or not nueva_pass:
-                    st.error("Todos los 
+            nombres_borrar = [str(a.get("Asesor")) for a in lista_asesores if a.get("Asesor") != "Administrador" and "Asesor" in a]
+            if nombres_borrar:
+                asesor_a_borrar = st.selectbox("Seleccionar", nombres_borrar)
+                if st.button("Eliminar", type="primary"):
+                    lista_asesores = [a for a in lista_asesores if str(a.get("Asesor")) != asesor_a_borrar]
+                    guardar_lista("asesores", lista_asesores)
+
+                    lista_usuarios = [u for u in lista_usuarios if str(u.get("Usuario")) != asesor_a_borrar]
+                    guardar_lista("users", lista_usuarios)
+
+                    st.success("Eliminado.")
+                    st.rerun()
+            else:
+                st.info("No hay asesores para eliminar.")
+        else:
+            st.info("Sin registros.")
+        
