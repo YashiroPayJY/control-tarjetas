@@ -41,30 +41,50 @@ def cargar_datos():
     tras = cargar_csv(ARCHIVOS["tras"]).to_dict("records") if not cargar_csv(ARCHIVOS["tras"]).empty else []
     cred = cargar_csv(ARCHIVOS["cred"]).to_dict("records") if not cargar_csv(ARCHIVOS["cred"]).empty else []
     
+    # Cargar usuarios
     df_u = cargar_csv(ARCHIVOS["users"])
-    if df_u.empty:
+    if df_u.empty or "Usuario" not in df_u.columns:
         df_u = pd.DataFrame([{"Usuario": "Administrador", "Contrasena": "admin123", "Rol": "Admin"}])
         df_u.to_csv(ARCHIVOS["users"], index=False)
     usuarios_list = df_u.to_dict("records")
 
+    # Cargar asesores con blindaje total ante archivos viejos
     df_as = cargar_csv(ARCHIVOS["asesores"])
-    if df_as.empty:
-        asesores_base = [
-            {"Asesor": "Edgardo", "Rol": "Estandar", "Contrasena": "1234"},
-            {"Asesor": "Alexandra", "Rol": "Estandar", "Contrasena": "1234"},
-            {"Asesor": "Yeriz", "Rol": "Estandar", "Contrasena": "1234"},
-            {"Asesor": "Alejandro", "Rol": "Estandar", "Contrasena": "1234"},
-            {"Asesor": "P Marca", "Rol": "Estandar", "Contrasena": "1234"},
-            {"Asesor": "A Rutero", "Rol": "Estandar", "Contrasena": "1234"}
-        ]
+    asesores_base = [
+        {"Asesor": "Edgardo", "Rol": "Estandar", "Contrasena": "1234"},
+        {"Asesor": "Alexandra", "Rol": "Estandar", "Contrasena": "1234"},
+        {"Asesor": "Yeriz", "Rol": "Estandar", "Contrasena": "1234"},
+        {"Asesor": "Alejandro", "Rol": "Estandar", "Contrasena": "1234"},
+        {"Asesor": "P Marca", "Rol": "Estandar", "Contrasena": "1234"},
+        {"Asesor": "A Rutero", "Rol": "Estandar", "Contrasena": "1234"}
+    ]
+
+    if df_as.empty or "Asesor" not in df_as.columns:
         df_as = pd.DataFrame(asesores_base)
         df_as.to_csv(ARCHIVOS["asesores"], index=False)
-        for a in asesores_base:
-            if not any(u["Usuario"] == a["Asesor"] for u in usuarios_list):
-                usuarios_list.append({"Usuario": a["Asesor"], "Contrasena": a["Contrasena"], "Rol": a["Rol"]})
-        pd.DataFrame(usuarios_list).to_csv(ARCHIVOS["users"], index=False)
-    
+    else:
+        # Si el archivo viejo tiene las columnas con nombres distintos o incompletos, los normalizamos
+        if "Rol" not in df_as.columns:
+            df_as["Rol"] = "Estandar"
+        if "Contrasena" not in df_as.columns:
+            df_as["Contrasena"] = "1234"
+        # Si tenía nombres viejos en otra columna
+        if "Nombre" in df_as.columns and "Asesor" not in df_as.columns:
+            df_as["Asesor"] = df_as["Nombre"]
+
     asesores_list = df_as.to_dict("records")
+
+    # Sincronizar usuarios
+    for a in asesores_list:
+        nombre_a = a.get("Asesor")
+        if nombre_a and not any(u.get("Usuario") == nombre_a for u in usuarios_list):
+            usuarios_list.append({
+                "Usuario": nombre_a, 
+                "Contrasena": str(a.get("Contrasena", "1234")), 
+                "Rol": a.get("Rol", "Estandar")
+            })
+    pd.DataFrame(usuarios_list).to_csv(ARCHIVOS["users"], index=False)
+
     return inv, ent, tras, cred, usuarios_list, asesores_list
 
 def guardar_inv(inv):
@@ -150,7 +170,7 @@ if "usuario_actual" in st.session_state:
         del st.session_state["rol_actual"]
         st.rerun()
 
-nombres_asesores_plana = [a["Asesor"] for a in lista_asesores] if lista_asesores else ["Sin Asesor"]
+nombres_asesores_plana = [a["Asesor"] for a in lista_asesores if "Asesor" in a] if lista_asesores else ["Sin Asesor"]
 
 if menu == "Registrar Venta":
     st.header("Registrar Venta Payjoy")
@@ -445,11 +465,13 @@ elif menu == "Gestion de Asesores y Accesos (Admin)":
         st.markdown("---")
         st.subheader("Asesores Actuales")
         if lista_asesores:
-            st.dataframe(pd.DataFrame(lista_asesores)[["Asesor", "Rol"]], use_container_width=True)
+            df_temp = pd.DataFrame(lista_asesores)
+            cols_mostrar = [c for c in ["Asesor", "Rol"] if c in df_temp.columns]
+            st.dataframe(df_temp[cols_mostrar], use_container_width=True)
     elif rol_actual != "Admin":
         st.error("Acceso restringido para Administradores.")
     else:
-        st.success("Admin Activo. Registra un nuevo asesor o elimina uno existente para volver a crearlo:")
+        st.success("Admin Activo. Registra un nuevo asesor o elimina uno existente:")
         
         with st.form("form_nuevo_asesor_user", clear_on_submit=True):
             st.subheader("➕ Crear Nuevo Asesor y Contraseña")
@@ -459,17 +481,4 @@ elif menu == "Gestion de Asesores y Accesos (Admin)":
 
             if st.form_submit_button("Crear Asesor y Acceso"):
                 if not nuevo_nombre or not nueva_pass:
-                    st.error("Todos los campos son obligatorios.")
-                elif any(a["Asesor"] == nuevo_nombre for a in lista_asesores):
-                    st.warning("Ese nombre de asesor ya existe.")
-                else:
-                    lista_asesores.append({"Asesor": nuevo_nombre, "Rol": nuevo_rol, "Contrasena": nueva_pass})
-                    guardar_lista("asesores", lista_asesores)
-
-                    if not any(u["Usuario"] == nuevo_nombre for u in lista_usuarios):
-                        lista_usuarios.append({"Usuario": nuevo_nombre, "Contrasena": nueva_pass, "Rol": nuevo_rol})
-                    else:
-                        for u in lista_usuarios:
-                            if u["Usuario"] == nuevo_nombre:
-                                u["Contrasena"] = nueva_pass
-                                u["Rol"] = nuevo_
+                    st.error("Todos los 
