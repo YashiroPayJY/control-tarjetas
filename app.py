@@ -109,7 +109,7 @@ def a_excel(df):
   return out.getvalue()
 
 
-inventario, entradas, traslados, creditos, lista_usuarios, lista_asesores = cargar_datos()
+inventario, entradas, traslados, cred, lista_usuarios, lista_asesores = cargar_datos()
 
 TIPOS_VENTA = ["Venta en tienda", "Cliente agendado"]
 MARCAS = [
@@ -230,7 +230,7 @@ if menu == "📱 Registrar Venta":
         inventario[tarj_sel] -= cant_t
         guardar_inv(inventario)
 
-      creditos.append({
+      cred.append({
           "Fecha": str(fecha_v),
           "Cliente": cliente,
           "Marca de Celular": marca,
@@ -242,7 +242,7 @@ if menu == "📱 Registrar Venta":
           "Cantidad": 1,
           "Asesor": asesor,
       })
-      guardar_lista("cred", creditos)
+      guardar_lista("cred", cred)
       if aprobaron_tarjeta == "Sí" and lleva_t == "No":
         st.success("✅ ¡Venta registrada! Como no llevó tarjeta física, quedó guardada en Pendientes de Entrega.")
       else:
@@ -259,8 +259,8 @@ elif menu == "📊 Dashboard & Cumplimiento":
     df_mes = pd.DataFrame()
     ventas_mes = 0
 
-    if creditos:
-      df_c = pd.DataFrame(creditos)
+    if cred:
+      df_c = pd.DataFrame(cred)
       if "Fecha" in df_c.columns and "Cantidad" in df_c.columns:
         df_c["_dt"] = pd.to_datetime(df_c["Fecha"], errors="coerce")
         df_mes = df_c[
@@ -310,7 +310,7 @@ elif menu == "💳 Entregar Tarjeta Pendiente":
     st.warning("🔒 Por favor, inicia sesión en la barra lateral con tu usuario y contraseña.")
   else:
     pendientes = [
-        (i, c) for i, c in enumerate(creditos) if c.get("¿Aprobaron Tarjeta?") == "Sí" and c.get("¿Lleva Tarjeta?") == "No"
+        (i, c) for i, c in enumerate(cred) if c.get("¿Aprobaron Tarjeta?") == "Sí" and c.get("¿Lleva Tarjeta?") == "No"
     ]
 
     if not pendientes:
@@ -338,11 +338,11 @@ elif menu == "💳 Entregar Tarjeta Pendiente":
             idx = int(elegido.split("#")[1].split(" -")[0])
             inventario[t_ent] -= 1
             guardar_inv(inventario)
-            creditos[idx]["¿Lleva Tarjeta?"] = "Sí"
-            creditos[idx]["Tarjeta Entregada"] = t_ent
+            cred[idx]["¿Lleva Tarjeta?"] = "Sí"
+            cred[idx]["Tarjeta Entregada"] = t_ent
             if tag_pend:
-              creditos[idx]["Tag Dispositivo"] = tag_pend
-            guardar_lista("cred", creditos)
+              cred[idx]["Tag Dispositivo"] = tag_pend
+            guardar_lista("cred", cred)
             st.success("¡Tarjeta entregada con éxito!")
             st.rerun()
 
@@ -459,7 +459,7 @@ elif menu == "📂 Historiales":
 
 
     if sub == "Créditos":
-      df_r = procesar_df(creditos, "Fecha")
+      df_r = procesar_df(cred, "Fecha")
       st.dataframe(df_r, use_container_width=True)
       if not df_r.empty:
         st.download_button("📥 Descargar Reporte Excel", a_excel(df_r), "creditos.xlsx")
@@ -468,12 +468,12 @@ elif menu == "📂 Historiales":
       st.subheader("⚙️ Anulación / Reversión de Créditos Mal Gestionados")
       if rol_actual != "Admin":
         st.warning("⚠️ Solo los usuarios con rol **Admin** pueden anular o revertir créditos.")
-      elif creditos:
-        ops = [f"#{i} - Cliente: {c.get('Cliente')} - Fecha: {c.get('Fecha')}" for i, c in enumerate(creditos)]
+      elif cred:
+        ops = [f"#{i} - Cliente: {c.get('Cliente')} - Fecha: {c.get('Fecha')}" for i, c in enumerate(cred)]
         a_borrar = st.selectbox("Seleccione el crédito a anular:", ops)
         if st.button("🗑️ Anular / Revertir Crédito", type="primary"):
           idx = int(a_borrar.split("#")[1].split(" -")[0])
-          item = creditos.pop(idx)
+          item = cred.pop(idx)
           if (
               item.get("¿Lleva Tarjeta?") == "Sí"
               and item.get("Tarjeta Entregada") != "N/A"
@@ -481,7 +481,7 @@ elif menu == "📂 Historiales":
             t = item.get("Tarjeta Entregada")
             inventario[t] = inventario.get(t, 0) + 1
             guardar_inv(inventario)
-          guardar_lista("cred", creditos)
+          guardar_lista("cred", cred)
           st.success("✅ Crédito anulado correctamente y stock devuelto (si aplica).")
           st.rerun()
 
@@ -553,4 +553,5 @@ elif menu == "👥 Gestión de Asesores y Accesos (Admin)":
       st.dataframe(df_view_asesores, use_container_width=True)
 
       nombres_borrar = [a["Asesor"] for a in lista_asesores if a["Asesor"] != "Administrador"]
-      if no
+      if nombres_borrar:
+        asesor_a_borrar = st.selectbox("Selecc
