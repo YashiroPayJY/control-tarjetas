@@ -72,14 +72,17 @@ def cargar_datos():
 
     for a in asesores_list:
         nombre_a = a.get("Asesor")
+        pass_a = str(a.get("Contrasena", "1234"))
+        rol_a = a.get("Rol", "Estandar")
         if nombre_a and not any(u.get("Usuario") == nombre_a for u in usuarios_list):
-            usuarios_list.append({
-                "Usuario": nombre_a, 
-                "Contrasena": str(a.get("Contrasena", "1234")), 
-                "Rol": a.get("Rol", "Estandar")
-            })
-    pd.DataFrame(usuarios_list).to_csv(ARCHIVOS["users"], index=False)
+            usuarios_list.append({"Usuario": nombre_a, "Contrasena": pass_a, "Rol": rol_a})
+        else:
+            for u in usuarios_list:
+                if u.get("Usuario") == nombre_a:
+                    u["Contrasena"] = pass_a
+                    u["Rol"] = rol_a
 
+    pd.DataFrame(usuarios_list).to_csv(ARCHIVOS["users"], index=False)
     return inv, ent, tras, cred, usuarios_list, asesores_list
 
 def guardar_inv(inv):
@@ -459,26 +462,27 @@ elif menu == "Gestion Asesores":
                     st.rerun()
 
         st.markdown("---")
-        st.subheader("Eliminar Asesor")
+        st.subheader("Lista de Accesos (Contraseñas y Roles)")
         if lista_asesores:
             df_temp = pd.DataFrame(lista_asesores)
-            cols_mostrar = [c for c in ["Asesor", "Rol"] if c in df_temp.columns]
+            cols_mostrar = [c for c in ["Asesor", "Rol", "Contrasena"] if c in df_temp.columns]
             st.dataframe(df_temp[cols_mostrar], use_container_width=True)
 
             nombres_borrar = [str(a.get("Asesor")) for a in lista_asesores if a.get("Asesor") != "Administrador" and "Asesor" in a]
             if nombres_borrar:
+                st.markdown("---")
+                st.subheader("Eliminar o Recrear Asesor (Para cambiar contraseña)")
                 asesor_a_borrar = st.selectbox("Seleccionar", nombres_borrar)
-                if st.button("Eliminar", type="primary"):
+                if st.button("Eliminar Asesor Seleccionado", type="primary"):
                     lista_asesores = [a for a in lista_asesores if str(a.get("Asesor")) != asesor_a_borrar]
                     guardar_lista("asesores", lista_asesores)
 
                     lista_usuarios = [u for u in lista_usuarios if str(u.get("Usuario")) != asesor_a_borrar]
                     guardar_lista("users", lista_usuarios)
 
-                    st.success("Eliminado.")
+                    st.success("Eliminado. Ahora puedes volver a crearlo arriba con su nueva contraseña.")
                     st.rerun()
             else:
-                st.info("No hay asesores para eliminar.")
+                st.info("No hay asesores adicionales para eliminar.")
         else:
-            st.info("Sin registros.")
-        
+            st.info("Sin 
