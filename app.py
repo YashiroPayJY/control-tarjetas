@@ -276,7 +276,7 @@ elif menu == "Dashboard y Cumplimiento":
             t_asesor["% Meta"] = ((t_asesor["Cantidad"] / META) * 100).round(2).astype(str) + "%"
             st.dataframe(t_asesor, use_container_width=True)
         else:
-            st.info("Sin registros este mes.")
+            st.info("Sin registros.")
 
 elif menu == "Entregar Tarjeta Pendiente":
     st.header("Entregar Tarjeta Pendiente")
@@ -462,7 +462,7 @@ elif menu == "Gestion Asesores":
                     st.rerun()
 
         st.markdown("---")
-        st.subheader("Lista de Accesos (Contraseñas y Roles)")
+        st.subheader("Lista de Accesos (Usuarios, Roles y Contraseñas)")
         if lista_asesores:
             df_temp = pd.DataFrame(lista_asesores)
             cols_mostrar = [c for c in ["Asesor", "Rol", "Contrasena"] if c in df_temp.columns]
@@ -471,7 +471,7 @@ elif menu == "Gestion Asesores":
             nombres_borrar = [str(a.get("Asesor")) for a in lista_asesores if a.get("Asesor") != "Administrador" and "Asesor" in a]
             if nombres_borrar:
                 st.markdown("---")
-                st.subheader("Eliminar o Recrear Asesor (Para cambiar contraseña)")
+                st.subheader("Eliminar o Recrear Asesor")
                 asesor_a_borrar = st.selectbox("Seleccionar", nombres_borrar)
                 if st.button("Eliminar Asesor Seleccionado", type="primary"):
                     lista_asesores = [a for a in lista_asesores if str(a.get("Asesor")) != asesor_a_borrar]
@@ -480,9 +480,10 @@ elif menu == "Gestion Asesores":
                     lista_usuarios = [u for u in lista_usuarios if str(u.get("Usuario")) != asesor_a_borrar]
                     guardar_lista("users", lista_usuarios)
 
-                    st.success("Eliminado. Ahora puedes volver a crearlo arriba con su nueva contraseña.")
+                    st.success("Eliminado.")
                     st.rerun()
             else:
-                st.info("No hay asesores adicionales para eliminar.")
+                st.info("Sin asesores extra.")
         else:
-            st.info("Sin 
+            st.info("Sin registros.")
+            
