@@ -1,5 +1,6 @@
 import calendar
 import datetime
+import json
 from zoneinfo import ZoneInfo
 import io
 import os
@@ -15,21 +16,9 @@ ADMIN_PASS = "admin123"
 @st.cache_resource
 def conectar():
     scope = ["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive"]
-    # Leemos directamente desde st.secrets
-    sec = st.secrets["gcp_service_account"]
-    creds_dict = {
-        "type": sec["type"],
-        "project_id": sec["project_id"],
-        "private_key_id": sec["private_key_id"],
-        "private_key": sec["private_key"].replace("\\n", "\n"),
-        "client_email": sec["client_email"],
-        "client_id": sec["client_id"],
-        "auth_uri": sec["auth_uri"],
-        "token_uri": sec["token_uri"],
-        "auth_provider_x509_cert_url": sec["auth_provider_x509_cert_url"],
-        "client_x509_cert_url": sec["client_x509_cert_url"]
-    }
-    creds = Credentials.from_service_account_info(creds_dict, scopes=scope)
+    # Lee el texto completo del JSON guardado en secrets[span_1](start_span)[span_1](end_span)
+    json_info = json.loads(st.secrets["gcp_service_account"]["text"])
+    creds = Credentials.from_service_account_info(json_info, scopes=scope)
     return gspread.authorize(creds).open("Base_Datos_Payjoy")
 
 sh = conectar()
