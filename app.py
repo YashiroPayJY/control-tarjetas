@@ -19,6 +19,7 @@ ARCHIVOS = {
     "asesores": "asesores_control.csv",
     "marcas": "marcas_control.csv",
     "reg_tarjetas": "registro_tarjetas.csv",
+    "meta": "meta_control.csv",
 }
 
 ADMIN_PASS = "admin123"
@@ -45,6 +46,7 @@ def cargar_datos():
     cred = cargar_csv(ARCHIVOS["cred"]).to_dict("records") if not cargar_csv(ARCHIVOS["cred"]).empty else []
     reg_t = cargar_csv(ARCHIVOS["reg_tarjetas"]).to_dict("records") if not cargar_csv(ARCHIVOS["reg_tarjetas"]).empty else []
     
+    # Asesores
     df_as = cargar_csv(ARCHIVOS["asesores"])
     asesores_base = [
         {"Asesor": "Edgardo", "Contrasena": "1234"},
@@ -64,6 +66,7 @@ def cargar_datos():
             df_as["Asesor"] = df_as["Nombre"]
     asesores_list = df_as.to_dict("records")
 
+    # Marcas
     df_m = cargar_csv(ARCHIVOS["marcas"])
     marcas_base = ["Samsung", "Motorola", "Oppo", "Infinix", "Vivo", "Xiaomi", "Honor", "Tecno", "Realme"]
     if df_m.empty or "Marca" not in df_m.columns:
@@ -71,7 +74,18 @@ def cargar_datos():
         df_m.to_csv(ARCHIVOS["marcas"], index=False)
     marcas_list = df_m["Marca"].dropna().unique().tolist()
 
-    return inv, ent, tras, cred, reg_t, asesores_list, marcas_list
+    # Meta
+    df_meta = cargar_csv(ARCHIVOS["meta"])
+    meta_val = 200
+    if not df_meta.empty and "Meta" in df_meta.columns:
+        try:
+            meta_val = int(df_meta["Meta"].iloc[0])
+        except:
+            meta_val = 200
+    else:
+        pd.DataFrame([{"Meta": 200}]).to_csv(ARCHIVOS["meta"], index=False)
+
+    return inv, ent, tras, cred, reg_t, asesores_list, marcas_list, meta_val
 
 def guardar_inv(inv):
     cols = ["Tipo de Tarjeta", "Cantidad Disponible"]
@@ -82,16 +96,19 @@ def guardar_lista(clave, lista):
     df = pd.DataFrame(lista) if lista else pd.DataFrame()
     df.to_csv(ARCHIVOS[clave], index=False)
 
+def guardar_meta(meta_num):
+    df = pd.DataFrame([{"Meta": meta_num}])
+    df.to_csv(ARCHIVOS["meta"], index=False)
+
 def a_excel(df):
     out = io.BytesIO()
     with pd.ExcelWriter(out, engine="xlsxwriter") as w:
         df.to_excel(w, index=False, sheet_name="Reporte")
     return out.getvalue()
 
-inventario, entradas, traslados, cred, reg_tarjetas, lista_asesores, MARCAS = cargar_datos()
+inventario, entradas, traslados, cred, reg_tarjetas, lista_asesores, MARCAS, META = cargar_datos()
 
 TIPOS_VENTA = ["Venta en tienda", "Cliente agendado"]
-META = 200
 
 st.title("Control Payjoy")
 st.markdown("---")
@@ -115,59 +132,63 @@ nombres_asesores_plana = [a["Asesor"] for a in lista_asesores if "Asesor" in a] 
 
 if menu == "Registrar Venta":
     st.header("Registrar Venta")
-    with st.form("f_venta", clear_on_submit=True):
-        cliente = st.text_input("Cliente").strip().title()
-        marca = st.selectbox("Marca", MARCAS)
-        tipo = st.selectbox("Tipo", TIPOS_VENTA)
-        aprobaron = st.selectbox("Aprobaron tarjeta?", ["Si", "No"])
-        
-        lleva_t = "No"
-        tarj_sel = None
-        cant_t = 0
-        stock_act = 0
-        tag_dispositivo = "N/A"
+    
+    cliente = st.text_input("Cliente").strip().title()
+    marca = st.selectbox("Marca", MARCAS)
+    tipo = st.selectbox("Tipo", TIPOS_VENTA)
+    aprobaron = st.selectbox("Aprobaron tarjeta?", ["Si", "No"])
+    
+    lleva_t = "No"
+    tarj_sel = None
+    cant_t = 0
+    stock_act = 0
+    tag_dispositivo = "N/A"
 
-        if aprobaron == "Si":
-            lleva_t = st.selectbox("Lleva Tarjeta?", ["Si", "No"])
-            if lleva_t == "Si":
-                if not inventario:
-                    st.error("Sin stock.")
-                else:
-                    tarj_sel = st.selectbox("Tarjeta", list(inventario.keys()))
-                    stock_act = inventario[tarj_sel]
-                    st.write("Stock: " + str(stock_act))
-                    cant_t = st.number_input("Cantidad", min_value=1, step=1, value=1)
-                tag_dispositivo = st.text_input("Tag").strip()
-
-        fecha_v = st.date_input("Fecha", value=obtener_hora().date())
-        asesor = st.selectbox("Asesor", nombres_asesores_plana)
-
-        if st.form_submit_button("Guardar Venta", type="primary"):
-            if not cliente:
-                st.warning("Falta cliente.")
-            elif aprobaron == "Si" and lleva_t == "Si" and not inventario:
-                st.error("Sin stock.")
-            elif aprobaron == "Si" and lleva_t == "Si" and cant_t > stock_act:
-                st.error("Stock insuficiente.")
+    if aprobaron == "Si":
+        lleva_t = st.selectbox("Lleva Tarjeta?", ["Si", "No"])
+        if lleva_t == "Si":
+            if not inventario:
+                st.error("Sin stock de tarjetas disponible.")
             else:
-                if aprobaron == "Si" and lleva_t == "Si" and tarj_sel:
-                    inventario[tarj_sel] -= cant_t
-                    guardar_inv(inventario)
+                tarj_sel = st.selectbox("Tarjeta", list(inventario.keys()))
+                stock_act = inventario[tarj_sel]
+                st.write("Stock actual: " + str(stock_act))
+                cant_t = st.number_input("Cantidad", min_value=1, step=1, value=1)
+            tag_dispositivo = st.text_input("Tag del Dispositivo").strip()
 
-                cred.append({
-                    "Fecha": str(fecha_v),
-                    "Cliente": cliente,
-                    "Marca de Celular": marca,
-                    "Tipo de Venta": tipo,
-                    "Aprobaron Tarjeta": aprobaron,
-                    "Lleva Tarjeta": lleva_t,
-                    "Tarjeta Entregada": tarj_sel if (aprobaron == "Si" and lleva_t == "Si") else "N/A",
-                    "Tag Dispositivo": tag_dispositivo if (aprobaron == "Si" and lleva_t == "Si" and tag_dispositivo) else "N/A",
-                    "Cantidad": 1,
-                    "Asesor": asesor,
-                })
-                guardar_lista("cred", cred)
-                st.success("Guardado con exito.")
+    fecha_v = st.date_input("Fecha", value=obtener_hora().date())
+    asesor = st.selectbox("Asesor", nombres_asesores_plana)
+
+    if st.button("Guardar Venta", type="primary"):
+        if not cliente:
+            st.warning("Falta el nombre del cliente.")
+        elif aprobaron == "Si" and lleva_t == "Si" and not inventario:
+            st.error("No hay tarjetas en stock.")
+        elif aprobaron == "Si" and lleva_t == "Si" and cant_t > stock_act:
+            st.error("Stock insuficiente.")
+        else:
+            if aprobaron == "Si" and lleva_t == "Si" and tarj_sel:
+                inventario[tarj_sel] -= cant_t
+                guardar_inv(inventario)
+
+            cred.append({
+                "Fecha": str(fecha_v),
+                "Cliente": cliente,
+                "Marca de Celular": marca,
+                "Tipo de Venta": tipo,
+                "Aprobaron Tarjeta": aprobaron,
+                "Lleva Tarjeta": lleva_t,
+                "Tarjeta Entregada": tarj_sel if (aprobaron == "Si" and lleva_t == "Si") else "N/A",
+                "Tag Dispositivo": tag_dispositivo if (aprobaron == "Si" and lleva_t == "Si" and tag_dispositivo) else "N/A",
+                "Cantidad": 1,
+                "Asesor": asesor,
+            })
+            guardar_lista("cred", cred)
+            if aprobaron == "Si" and lleva_t == "No":
+                st.success("✅ Venta registrada. Quedó guardada en Pendientes de Entrega.")
+            else:
+                st.success("✅ ¡Venta registrada con éxito!")
+            st.rerun()
 
 elif menu == "Registrar Tarjeta":
     st.header("Registrar Tarjeta")
@@ -228,17 +249,17 @@ elif menu == "Dashboard":
             df_mes = df_c[(df_c["_dt"].dt.month == ahora.month) & (df_c["_dt"].dt.year == ahora.year)]
             ventas_mes = int(df_mes["Cantidad"].sum()) if not df_mes.empty else 0
 
-    pct = min(round((ventas_mes / META) * 100, 2), 100.0)
+    pct = min(round((ventas_mes / META) * 100, 2), 100.0) if META > 0 else 0.0
     prom_diario = (ventas_mes / ahora.day) if ahora.day > 0 else 0
     proy = int(prom_diario * dias_mes)
 
     c1, c2, c3, c4 = st.columns(4)
-    c1.metric("Meta", str(META))
+    c1.metric("Meta Actual", str(META))
     c2.metric("Vendidos", str(ventas_mes))
     c3.metric("Cumple", str(pct) + "%")
     c4.metric("Proyeccion", str(proy))
 
-    st.progress(min(ventas_mes / META, 1.0))
+    st.progress(min(ventas_mes / META, 1.0) if META > 0 else 1.0)
     st.markdown("---")
 
     if not df_mes.empty and "Marca de Celular" in df_mes.columns:
@@ -254,10 +275,10 @@ elif menu == "Dashboard":
 
         st.subheader("Detalle")
         t_asesor = df_mes.groupby("Asesor")["Cantidad"].sum().reset_index()
-        t_asesor["% Meta"] = ((t_asesor["Cantidad"] / META) * 100).round(2).astype(str) + "%"
+        t_asesor["% Meta"] = ((t_asesor["Cantidad"] / META) * 100).round(2).astype(str) + "%" if META > 0 else "0%"
         st.dataframe(t_asesor, use_container_width=True)
     else:
-        st.info("Sin registros.")
+        st.info("Sin registros este mes.")
 
 elif menu == "Pendientes":
     st.header("Pendientes")
@@ -366,18 +387,24 @@ elif menu == "Historiales":
 
         if cred:
             st.markdown("---")
+            st.subheader("🔐 Anular Crédito (Requiere Contraseña de Administrador)")
+            pass_anular = st.text_input("Contraseña de Administrador para Anular", type="password", key="pass_anulacion")
             ops = ["#" + str(i) + " - " + str(c.get('Cliente')) for i, c in enumerate(cred)]
-            a_borrar = st.selectbox("Anular", ops)
-            if st.button("Anular Credito", type="primary"):
-                idx = int(a_borrar.split("#")[1].split(" ")[0])
-                item = cred.pop(idx)
-                if item.get("Lleva Tarjeta") == "Si" and item.get("Tarjeta Entregada") != "N/A":
-                    t = item.get("Tarjeta Entregada")
-                    inventario[t] = inventario.get(t, 0) + 1
-                    guardar_inv(inventario)
-                guardar_lista("cred", cred)
-                st.success("Anulado.")
-                st.rerun()
+            a_borrar = st.selectbox("Seleccione crédito a anular", ops)
+            
+            if st.button("Anular Crédito", type="primary"):
+                if pass_anular == ADMIN_PASS:
+                    idx = int(a_borrar.split("#")[1].split(" ")[0])
+                    item = cred.pop(idx)
+                    if item.get("Lleva Tarjeta") == "Si" and item.get("Tarjeta Entregada") != "N/A":
+                        t = item.get("Tarjeta Entregada")
+                        inventario[t] = inventario.get(t, 0) + 1
+                        guardar_inv(inventario)
+                    guardar_lista("cred", cred)
+                    st.success("✅ Crédito anulado correctamente y stock devuelto.")
+                    st.rerun()
+                else:
+                    st.error("❌ Contraseña de administrador incorrecta.")
 
     elif sub == "Tarjetas":
         df_r = pd.DataFrame(reg_tarjetas) if reg_tarjetas else pd.DataFrame()
@@ -403,7 +430,7 @@ elif menu == "Gestion":
     
     if pass_ingresada == ADMIN_PASS:
         st.success("Acceso concedido.")
-        tab1, tab2 = st.tabs(["Asesores", "Marcas"])
+        tab1, tab2, tab3 = st.tabs(["Asesores", "Marcas", "Meta del Mes"])
         
         with tab1:
             with st.form("f_asesor", clear_on_submit=True):
@@ -456,8 +483,5 @@ elif menu == "Gestion":
                     st.success("Eliminada.")
                     st.rerun()
 
-    elif pass_ingresada:
-        st.error("Contraseña incorrecta.")
-    else:
-        st.info("Introduce la contraseña de administrador.")
-    
+        with tab3:
+            with s
