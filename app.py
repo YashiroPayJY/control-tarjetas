@@ -245,7 +245,7 @@ elif menu == "Dashboard":
     proy = int(prom_diario * dias_mes)
 
     c1, c2, c3, c4 = st.columns(4)
-    c1.metric("Meta Actual", str(META))
+    c1.metric("Meta", str(META))
     c2.metric("Vendidos", str(ventas_mes))
     c3.metric("Cumple", str(pct) + "%")
     c4.metric("Proyeccion", str(proy))
@@ -424,20 +424,18 @@ elif menu == "Gestion":
         tab1, tab2, tab3 = st.tabs(["Asesores", "Marcas", "Meta"])
         
         with tab1:
-            with st.form("f_asesor", clear_on_submit=True):
-                nuevo_nombre = st.text_input("Asesor").strip().title()
-                nueva_pass = st.text_input("Password", type="password").strip()
-                submitted_asesor = st.form_submit_button("Crear")
-                if submitted_asesor:
-                    if not nuevo_nombre or not nueva_pass:
-                        st.error("Campos vacios.")
-                    elif any(str(a.get("Asesor")) == nuevo_nombre for a in lista_asesores):
-                        st.warning("Ya existe.")
-                    else:
-                        lista_asesores.append({"Asesor": nuevo_nombre, "Contrasena": nueva_pass})
-                        guardar_lista("asesores", lista_asesores)
-                        st.success("Creado.")
-                        st.rerun()
+            nuevo_nombre = st.text_input("Asesor").strip().title()
+            nueva_pass = st.text_input("Password", type="password", key="pass_as_nuevo").strip()
+            if st.button("Crear Asesor", key="btn_crear_as"):
+                if not nuevo_nombre or not nueva_pass:
+                    st.error("Campos vacios.")
+                elif any(str(a.get("Asesor")) == nuevo_nombre for a in lista_asesores):
+                    st.warning("Ya existe.")
+                else:
+                    lista_asesores.append({"Asesor": nuevo_nombre, "Contrasena": nueva_pass})
+                    guardar_lista("asesores", lista_asesores)
+                    st.success("Creado.")
+                    st.rerun()
 
             st.markdown("---")
             if lista_asesores:
@@ -445,39 +443,45 @@ elif menu == "Gestion":
                 nombres_borrar = [str(a.get("Asesor")) for a in lista_asesores if a.get("Asesor") != "Edgardo" and "Asesor" in a]
                 if nombres_borrar:
                     asesor_a_borrar = st.selectbox("Eliminar", nombres_borrar, key="del_a")
-                    if st.button("Borrar", type="primary", key="btn_del_asesor"):
+                    if st.button("Borrar Asesor", type="primary", key="btn_del_asesor"):
                         lista_asesores = [a for a in lista_asesores if str(a.get("Asesor")) != asesor_a_borrar]
                         guardar_lista("asesores", lista_asesores)
                         st.success("Eliminado.")
                         st.rerun()
 
         with tab2:
-            with st.form("f_marca", clear_on_submit=True):
-                nueva_marca = st.text_input("Marca").strip().title()
-                submitted_marca = st.form_submit_button("Agregar")
-                if submitted_marca:
-                    if not nueva_marca:
-                        st.error("Vacio.")
-                    elif nueva_marca in MARCAS:
-                        st.warning("Ya existe.")
-                    else:
-                        MARCAS.append(nueva_marca)
-                        guardar_lista("marcas", [{"Marca": m} for m in MARCAS])
-                        st.success("Agregada.")
-                        st.rerun()
+            nueva_marca = st.text_input("Marca").strip().title()
+            if st.button("Agregar Marca", key="btn_agregar_marca"):
+                if not nueva_marca:
+                    st.error("Vacio.")
+                elif nueva_marca in MARCAS:
+                    st.warning("Ya existe.")
+                else:
+                    MARCAS.append(nueva_marca)
+                    guardar_lista("marcas", [{"Marca": m} for m in MARCAS])
+                    st.success("Agregada.")
+                    st.rerun()
 
             st.markdown("---")
             if MARCAS:
                 st.dataframe(pd.DataFrame(MARCAS, columns=["Marca"]), use_container_width=True)
                 marca_a_borrar = st.selectbox("Eliminar", MARCAS, key="del_m")
-                if st.button("Borrar", type="primary", key="btn_del_marca"):
+                if st.button("Borrar Marca", type="primary", key="btn_del_marca"):
                     MARCAS.remove(marca_a_borrar)
                     guardar_lista("marcas", [{"Marca": m} for m in MARCAS])
                     st.success("Eliminada.")
                     st.rerun()
 
         with tab3:
-            with st.form("f_meta", clear_on_submit=True):
-                st.subheader("Meta")
-                st.write("Actual: " + str(META))
-                nueva_meta = st.number_input("Nueva Meta", min_va
+            st.write("Meta actual: " + str(META))
+            nueva_meta = st.number_input("Nueva Meta", min_value=1, step=1, value=int(META), key="num_meta_val")
+            if st.button("Actualizar Meta", key="btn_act_meta"):
+                guardar_meta(nueva_meta)
+                st.success("Actualizado.")
+                st.rerun()
+
+    elif pass_ingresada:
+        st.error("Password incorrecta.")
+    else:
+        st.info("Introduce la password.")
+            
