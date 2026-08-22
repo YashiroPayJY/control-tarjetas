@@ -21,7 +21,7 @@ ARCHIVOS = {
     "reg_tarjetas": "registro_tarjetas.csv",
 }
 
-ADMIN_PASS = "admin123"  # Contraseña maestra para gestionar asesores y marcas
+ADMIN_PASS = "admin123"
 
 def obtener_hora():
     return datetime.datetime.now(ZoneInfo("America/Bogota"))
@@ -45,7 +45,6 @@ def cargar_datos():
     cred = cargar_csv(ARCHIVOS["cred"]).to_dict("records") if not cargar_csv(ARCHIVOS["cred"]).empty else []
     reg_t = cargar_csv(ARCHIVOS["reg_tarjetas"]).to_dict("records") if not cargar_csv(ARCHIVOS["reg_tarjetas"]).empty else []
     
-    # Asesores
     df_as = cargar_csv(ARCHIVOS["asesores"])
     asesores_base = [
         {"Asesor": "Edgardo", "Contrasena": "1234"},
@@ -65,7 +64,6 @@ def cargar_datos():
             df_as["Asesor"] = df_as["Nombre"]
     asesores_list = df_as.to_dict("records")
 
-    # Marcas (respetando las existentes)
     df_m = cargar_csv(ARCHIVOS["marcas"])
     marcas_base = ["Samsung", "Motorola", "Oppo", "Infinix", "Vivo", "Xiaomi", "Honor", "Tecno", "Realme"]
     if df_m.empty or "Marca" not in df_m.columns:
@@ -116,9 +114,6 @@ menu = st.sidebar.selectbox(
 
 nombres_asesores_plana = [a["Asesor"] for a in lista_asesores if "Asesor" in a] if lista_asesores else ["Sin Asesor"]
 
-# ---------------------------------------------------------
-# 1. REGISTRAR VENTA
-# ---------------------------------------------------------
 if menu == "Registrar Venta":
     st.header("Registrar Venta Payjoy")
     
@@ -138,7 +133,7 @@ if menu == "Registrar Venta":
             lleva_t = st.selectbox("Lleva Tarjeta Fisica?", ["Si", "No"])
             if lleva_t == "Si":
                 if not inventario:
-                    st.error("No hay stock disponible de tarjetas.")
+                    st.error("No hay stock disponible.")
                 else:
                     tarj_sel = st.selectbox("Tarjeta", list(inventario.keys()))
                     stock_act = inventario[tarj_sel]
@@ -149,15 +144,13 @@ if menu == "Registrar Venta":
         fecha_v = st.date_input("Fecha", value=obtener_hora().date())
         asesor = st.selectbox("Asesor", nombres_asesores_plana)
 
-        submitted = st.form_submit_button("Registrar Venta", type="primary")
-        
-        if submitted:
+        if st.form_submit_button("Registrar Venta", type="primary"):
             if not cliente:
                 st.warning("Falta el nombre del cliente.")
             elif aprobaron_tarjeta == "Si" and lleva_t == "Si" and not inventario:
                 st.error("No hay tarjetas en stock.")
             elif aprobaron_tarjeta == "Si" and lleva_t == "Si" and cant_t > stock_act:
-                st.error("Stock insuficiente para la cantidad seleccionada.")
+                st.error("Stock insuficiente.")
             else:
                 if aprobaron_tarjeta == "Si" and lleva_t == "Si" and tarj_sel:
                     inventario[tarj_sel] -= cant_t
@@ -177,40 +170,34 @@ if menu == "Registrar Venta":
                 })
                 guardar_lista("cred", cred)
                 if aprobaron_tarjeta == "Si" and lleva_t == "No":
-                    st.success("✅ Venta registrada. Quedo guardada en Pendientes de Entrega.")
+                    st.success("✅ Venta registrada. Quedo en Pendientes de Entrega.")
                 else:
                     st.success("✅ ¡Venta registrada con exito!")
 
-# ---------------------------------------------------------
-# 2. REGISTRAR TARJETA (CON FORMULARIO PARA LIMPIARSE)
-# ---------------------------------------------------------
 elif menu == "Registrar Tarjeta":
-    st.header("💳 Registrar Tarjeta a Cliente (Sin Venta Nueva)")
-    st.markdown("Use esta sección para registrar una tarjeta física a un cliente que regresa por ella, descontándola del inventario de forma automática.")
+    st.header("💳 Registrar Tarjeta a Cliente")
+    st.markdown("Registra una tarjeta física y descontala del inventario automáticamente.")
 
     if not inventario:
-        st.error("⚠️ No hay inventario de tarjetas disponible en este momento.")
+        st.error("⚠️ No hay inventario disponible.")
     else:
-        # Usamos st.form con clear_on_submit=True para que se limpie al registrar
         with st.form("form_reg_tarjeta_limpiar", clear_on_submit=True):
             cliente_t = st.text_input("Nombre del Cliente").strip().title()
             tag_disp = st.text_input("Tag del Dispositivo").strip()
             
-            tarj_elegida = st.selectbox("Tarjeta a Asignar", list(inventario.keys()))
+            tarj_elegida = st.selectbox("Tarjeta", list(inventario.keys()))
             cant_asig = st.number_input("Cantidad", min_value=1, step=1, value=1)
             fecha_reg = st.date_input("Fecha", value=obtener_hora().date())
-            asesor_reg = st.selectbox("Asesor Responsable", nombres_asesores_plana)
+            asesor_reg = st.selectbox("Asesor", nombres_asesores_plana)
 
-            btn_reg_tarj = st.form_submit_button("Registrar y Descontar Tarjeta", type="primary")
-
-            if btn_reg_tarj:
+            if st.form_submit_button("Registrar y Descontar", type="primary"):
                 stock_disp_actual = inventario.get(tarj_elegida, 0)
                 if not cliente_t:
-                    st.warning("⚠️ Debe ingresar el nombre del cliente.")
+                    st.warning("⚠️ Falta el cliente.")
                 elif not tag_disp:
-                    st.warning("⚠️ Debe ingresar el tag del dispositivo.")
+                    st.warning("⚠️ Falta el tag.")
                 elif cant_asig > stock_disp_actual:
-                    st.error(f"⚠️ Stock insuficiente. Solo hay {stock_disp_actual} disponibles.")
+                    st.error("⚠️ Stock insuficiente.")
                 else:
                     inventario[tarj_elegida] -= cant_asig
                     guardar_inv(inventario)
@@ -224,20 +211,17 @@ elif menu == "Registrar Tarjeta":
                         "Asesor": asesor_reg
                     })
                     guardar_lista("reg_tarjetas", reg_tarjetas)
-                    st.success(f"✅ ¡Tarjeta '{tarj_elegida}' registrada y descontada con éxito! Campos limpios.")
+                    st.success("✅ ¡Tarjeta registrada y descontada con exito!")
 
         st.markdown("---")
-        st.subheader("📋 Historial de Tarjetas Registradas Independientemente")
+        st.subheader("📋 Historial de Tarjetas Registradas")
         if reg_tarjetas:
             df_reg_t = pd.DataFrame(reg_tarjetas)
             st.dataframe(df_reg_t, use_container_width=True)
-            st.download_button("📥 Descargar Reporte en Excel", a_excel(df_reg_t), "tarjetas_registradas.xlsx")
+            st.download_button("📥 Descargar Excel", a_excel(df_reg_t), "tarjetas_registradas.xlsx")
         else:
-            st.info("No hay registros de tarjetas independientes aún.")
+            st.info("Sin registros.")
 
-# ---------------------------------------------------------
-# 3. DASHBOARD & CUMPLIMIENTO
-# ---------------------------------------------------------
 elif menu == "Dashboard y Cumplimiento":
     st.header("Dashboard Gerencial")
     ahora = obtener_hora()
@@ -285,9 +269,6 @@ elif menu == "Dashboard y Cumplimiento":
     else:
         st.info("Sin registros.")
 
-# ---------------------------------------------------------
-# 4. ENTREGAR TARJETA PENDIENTE
-# ---------------------------------------------------------
 elif menu == "Entregar Tarjeta Pendiente":
     st.header("Entregar Tarjeta Pendiente")
     pendientes = [(i, c) for i, c in enumerate(cred) if c.get("Aprobaron Tarjeta") == "Si" and c.get("Lleva Tarjeta") == "No"]
@@ -323,9 +304,6 @@ elif menu == "Entregar Tarjeta Pendiente":
                     st.success("Entregado.")
                     st.rerun()
 
-# ---------------------------------------------------------
-# 5. STOCK (INVENTARIO)
-# ---------------------------------------------------------
 elif menu == "Stock (Inventario)":
     st.header("Stock de Tarjetas")
     if not inventario:
@@ -334,9 +312,6 @@ elif menu == "Stock (Inventario)":
         df_i = pd.DataFrame(list(inventario.items()), columns=["Tarjeta", "Cantidad"])
         st.dataframe(df_i, use_container_width=True)
 
-# ---------------------------------------------------------
-# 6. INGRESAR LOTE
-# ---------------------------------------------------------
 elif menu == "Ingresar Lote":
     st.header("Ingresar Tarjetas")
     with st.form("f_lote", clear_on_submit=True):
@@ -361,9 +336,6 @@ elif menu == "Ingresar Lote":
             else:
                 st.warning("Falta nombre.")
 
-# ---------------------------------------------------------
-# 7. TRASLADO
-# ---------------------------------------------------------
 elif menu == "Traslado":
     st.header("Traslado")
     with st.form("f_tras", clear_on_submit=True):
@@ -395,9 +367,6 @@ elif menu == "Traslado":
                     guardar_lista("tras", traslados)
                     st.success("Traslado exitoso.")
 
-# ---------------------------------------------------------
-# 8. HISTORIALES
-# ---------------------------------------------------------
 elif menu == "Historiales":
     st.header("Historiales")
     sub = st.radio("Ver:", ["Creditos", "Tarjetas Registradas", "Entradas", "Traslados"])
@@ -442,9 +411,6 @@ elif menu == "Historiales":
         if not df_r.empty:
             st.download_button("Excel", a_excel(df_r), "traslados.xlsx")
 
-# ---------------------------------------------------------
-# 9. GESTIÓN ASESORES Y MARCAS (PROTEGIDO)
-# ---------------------------------------------------------
 elif menu == "Gestion Asesores":
     st.header("Gestion de Asesores y Marcas")
     
@@ -453,9 +419,9 @@ elif menu == "Gestion Asesores":
     pass_ingresada = st.text_input("Ingrese Contraseña de Administrador", type="password")
     
     if pass_ingresada == ADMIN_PASS:
-        st.success("Contraseña Correcta. Acceso Concedido.")
+        st.success("Contraseña Correcta.")
         
-        tab1, tab2 = st.tabs(["👥 Gestion de Asesores", "📱 Gestion de Marcas"])
+        tab1, tab2 = st.tabs(["👥 Asesores", "📱 Marcas"])
         
         with tab1:
             with st.form("form_nuevo_asesor", clear_on_submit=True):
@@ -466,4 +432,46 @@ elif menu == "Gestion Asesores":
                 if st.form_submit_button("Crear"):
                     if not nuevo_nombre or not nueva_pass:
                         st.error("Campos obligatorios.")
-                    elif any(str(a.get("Asesor")) == nuevo_nombre for a
+                    elif any(str(a.get("Asesor")) == nuevo_nombre for a in lista_asesores):
+                        st.warning("Ya existe.")
+                    else:
+                        lista_asesores.append({"Asesor": nuevo_nombre, "Contrasena": nueva_pass})
+                        guardar_lista("asesores", lista_asesores)
+                        st.success("Creado con exito.")
+                        st.rerun()
+
+            st.markdown("---")
+            st.subheader("Lista de Asesores")
+            if lista_asesores:
+                st.dataframe(pd.DataFrame(lista_asesores), use_container_width=True)
+
+                nombres_borrar = [str(a.get("Asesor")) for a in lista_asesores if a.get("Asesor") != "Edgardo" and "Asesor" in a]
+                if nombres_borrar:
+                    st.markdown("---")
+                    asesor_a_borrar = st.selectbox("Eliminar Asesor", nombres_borrar, key="sel_del_asesor")
+                    if st.button("Eliminar Asesor", type="primary"):
+                        lista_asesores = [a for a in lista_asesores if str(a.get("Asesor")) != asesor_a_borrar]
+                        guardar_lista("asesores", lista_asesores)
+                        st.success("Eliminado.")
+                        st.rerun()
+            else:
+                st.info("Sin registros.")
+
+        with tab2:
+            with st.form("form_nueva_marca", clear_on_submit=True):
+                st.subheader("Agregar Marca")
+                nueva_marca = st.text_input("Nombre Marca").strip().title()
+
+                if st.form_submit_button("Agregar"):
+                    if not nueva_marca:
+                        st.error("Ingrese un nombre.")
+                    elif nueva_marca in MARCAS:
+                        st.warning("Ya existe.")
+                    else:
+                        MARCAS.append(nueva_marca)
+                        guardar_lista("marcas", [{"Marca": m} for m in MARCAS])
+                        st.success("Marca agregada.")
+                        st.rerun()
+
+            st.markdown("---")
+            st.subheader("Marcas Actual
