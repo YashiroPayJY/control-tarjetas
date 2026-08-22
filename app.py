@@ -6,45 +6,76 @@ import os
 import pandas as pd
 import plotly.express as px
 import streamlit as st
+import gspread
+from google.oauth2.service_account import Credentials
 
 st.set_page_config(page_title="Control Pro", page_icon="📱", layout="wide")
 
-ARCHIVOS = {
-    "inv": "inventario.csv",
-    "ent": "entradas.csv",
-    "cred": "creditos.csv",
-    "tras": "traslados.csv",
-    "asesores": "asesores_control.csv",
-    "marcas": "marcas_control.csv",
-    "reg_tarjetas": "registro_tarjetas.csv",
-    "meta": "meta_control.csv",
-}
-
 ADMIN_PASS = "admin123"
+
+# Conexión con Google Sheets
+@st.cache_resource
+def conectar_gsheets():
+    scope = [
+        "https://www.googleapis.com/auth/spreadsheets",
+        "https://www.googleapis.com/auth/drive"
+    ]
+    secrets_dict = dict(st.secrets["gcp_service_account"])
+    creds = Credentials.from_service_account_info(secrets_dict, scopes=scope)
+    client = gspread.authorize(creds)
+    return client.open("Base_Datos_Payjoy")
+
+try:
+    sh = conectar_gsheets()
+except Exception as e:
+    st.error(f"Error al conectar con Google Sheets: {e}")
+    st.stop()
 
 def obtener_hora():
     return datetime.datetime.now(ZoneInfo("America/Bogota"))
 
-def cargar_csv(archivo):
-    if os.path.exists(archivo) and os.path.getsize(archivo) > 0:
-        try:
-            return pd.read_csv(archivo).dropna(how="all")
-        except:
-            return pd.DataFrame()
-    return pd.DataFrame()
+def cargar_gsheet(nombre_pestana, columnas_defecto):
+    try:
+        ws = sh.worksheet(nombre_pestana)
+        data = ws.get_all_records()
+        if data:
+            df = pd.DataFrame(data)
+            for col in columnas_defecto:
+                if col not in df.columns:
+                    df[col] = ""
+            return df.dropna(how="all")
+        else:
+            return pd.DataFrame(columns=columnas_defecto)
+    except Exception:
+        return pd.DataFrame(columns=columnas_defecto)
+
+def guardar_gsheet(nombre_pestana, df):
+    try:
+        ws = sh.worksheet(nombre_pestana)
+        ws.clear()
+        if not df.empty:
+            ws.update([df.columns.values.tolist()] + df.astype(str).values.tolist())
+        else:
+            ws.update([[]])
+    except Exception as e:
+        st.error(f"Error al guardar en {nombre_pestana}: {e}")
 
 def cargar_datos():
-    df_inv = cargar_csv(ARCHIVOS["inv"])
+    df_inv = cargar_gsheet("inventario", ["Tipo de Tarjeta", "Cantidad Disponible"])
     inv = {}
     if not df_inv.empty and "Tipo de Tarjeta" in df_inv.columns:
-        inv = dict(zip(df_inv["Tipo de Tarjeta"], df_inv["Cantidad Disponible"]))
+        for _, row in df_inv.iterrows():
+            try:
+                inv[str(row["Tipo de Tarjeta"])] = int(row["Cantidad Disponible"])
+            except:
+                pass
 
-    ent = cargar_csv(ARCHIVOS["ent"]).to_dict("records") if not cargar_csv(ARCHIVOS["ent"]).empty else []
-    tras = cargar_csv(ARCHIVOS["tras"]).to_dict("records") if not cargar_csv(ARCHIVOS["tras"]).empty else []
-    cred = cargar_csv(ARCHIVOS["cred"]).to_dict("records") if not cargar_csv(ARCHIVOS["cred"]).empty else []
-    reg_t = cargar_csv(ARCHIVOS["reg_tarjetas"]).to_dict("records") if not cargar_csv(ARCHIVOS["reg_tarjetas"]).empty else []
+    ent = cargar_gsheet("entradas", ["Fecha Registro", "Fecha de Llegada", "Tarjeta", "Cantidad", "Responsable"]).to_dict("records")
+    tras = cargar_gsheet("traslados", ["Fecha/Hora", "Tarjeta", "Cantidad", "Destino", "Responsable"]).to_dict("records")
+    cred = cargar_gsheet("creditos", ["Fecha", "Cliente", "Marca de Celular", "Tipo de Venta", "Aprobaron Tarjeta", "Lleva Tarjeta", "Tarjeta Entregada", "Tag Dispositivo", "Cantidad", "Asesor"]).to_dict("records")
+    reg_t = cargar_gsheet("registro_tarjetas", ["Fecha", "Cliente", "Tag Dispositivo", "Tarjeta", "Cantidad", "Asesor"]).to_dict("records")
     
-    df_as = cargar_csv(ARCHIVOS["asesores"])
+    df_as = cargar_gsheet("asesores", ["Asesor", "Contrasena"])
     asesores_base = [
         {"Asesor": "Edgardo", "Contrasena": "1234"},
         {"Asesor": "Alexandra", "Contrasena": "1234"},
@@ -53,24 +84,19 @@ def cargar_datos():
         {"Asesor": "P Marca", "Contrasena": "1234"},
         {"Asesor": "A Rutero", "Contrasena": "1234"}
     ]
-    if df_as.empty or "Asesor" not in df_as.columns:
+    if df_as.empty:
         df_as = pd.DataFrame(asesores_base)
-        df_as.to_csv(ARCHIVOS["asesores"], index=False)
-    else:
-        if "Contrasena" not in df_as.columns:
-            df_as["Contrasena"] = "1234"
-        if "Nombre" in df_as.columns and "Asesor" not in df_as.columns:
-            df_as["Asesor"] = df_as["Nombre"]
+        guardar_gsheet("asesores", df_as)
     asesores_list = df_as.to_dict("records")
 
-    df_m = cargar_csv(ARCHIVOS["marcas"])
+    df_m = cargar_gsheet("marcas", ["Marca"])
     marcas_base = ["Samsung", "Motorola", "Oppo", "Infinix", "Vivo", "Xiaomi", "Honor", "Tecno", "Realme"]
-    if df_m.empty or "Marca" not in df_m.columns:
+    if df_m.empty:
         df_m = pd.DataFrame(marcas_base, columns=["Marca"])
-        df_m.to_csv(ARCHIVOS["marcas"], index=False)
+        guardar_gsheet("marcas", df_m)
     marcas_list = df_m["Marca"].dropna().unique().tolist()
 
-    df_meta = cargar_csv(ARCHIVOS["meta"])
+    df_meta = cargar_gsheet("meta", ["Meta"])
     meta_val = 200
     if not df_meta.empty and "Meta" in df_meta.columns:
         try:
@@ -78,21 +104,22 @@ def cargar_datos():
         except:
             meta_val = 200
     else:
-        pd.DataFrame([{"Meta": 200}]).to_csv(ARCHIVOS["meta"], index=False)
+        guardar_gsheet("meta", pd.DataFrame([{"Meta": 200}]))
 
     return inv, ent, tras, cred, reg_t, asesores_list, marcas_list, meta_val
 
 def guardar_inv(inv):
     cols = ["Tipo de Tarjeta", "Cantidad Disponible"]
     df = pd.DataFrame(list(inv.items()), columns=cols) if inv else pd.DataFrame(columns=cols)
-    df.to_csv(ARCHIVOS["inv"], index=False)
+    guardar_gsheet("inventario", df)
 
 def guardar_lista(clave, lista):
+    pestanas = {"cred": "creditos", "reg_tarjetas": "registro_tarjetas", "ent": "entradas", "tras": "traslados", "asesores": "asesores", "marcas": "marcas"}
     df = pd.DataFrame(lista) if lista else pd.DataFrame()
-    df.to_csv(ARCHIVOS[clave], index=False)
+    guardar_gsheet(pestanas.get(clave, clave), df)
 
 def guardar_meta(meta_num):
-    pd.DataFrame([{"Meta": meta_num}]).to_csv(ARCHIVOS["meta"], index=False)
+    guardar_gsheet("meta", pd.DataFrame([{"Meta": meta_num}]))
 
 def a_excel(df):
     out = io.BytesIO()
@@ -458,30 +485,4 @@ elif menu == "Gestion":
                     st.warning("Ya existe.")
                 else:
                     MARCAS.append(nueva_marca)
-                    guardar_lista("marcas", [{"Marca": m} for m in MARCAS])
-                    st.success("Agregada.")
-                    st.rerun()
-
-            st.markdown("---")
-            if MARCAS:
-                st.dataframe(pd.DataFrame(MARCAS, columns=["Marca"]), use_container_width=True)
-                marca_a_borrar = st.selectbox("Eliminar", MARCAS, key="del_m")
-                if st.button("Borrar Marca", type="primary", key="btn_del_marca"):
-                    MARCAS.remove(marca_a_borrar)
-                    guardar_lista("marcas", [{"Marca": m} for m in MARCAS])
-                    st.success("Eliminada.")
-                    st.rerun()
-
-        with tab3:
-            st.write("Meta actual: " + str(META))
-            nueva_meta = st.number_input("Nueva Meta", min_value=1, step=1, value=int(META), key="num_meta_val")
-            if st.button("Actualizar Meta", key="btn_act_meta"):
-                guardar_meta(nueva_meta)
-                st.success("Actualizado.")
-                st.rerun()
-
-    elif pass_ingresada:
-        st.error("Password incorrecta.")
-    else:
-        st.info("Introduce la password.")
-            
+                    guardar_lista("marcas", [{"Mar
