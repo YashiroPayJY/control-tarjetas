@@ -24,12 +24,13 @@ sh = conectar()
 
 def get_h(p, c):
     try:
-        data = sh.worksheet(p).get_all_records()
+        ws = sh.worksheet(p)
+        data = ws.get_all_records()
         if data:
             df = pd.DataFrame(data)
             for x in c:
                 if x not in df.columns: df[x] = ""
-            return df.dropna(how="all")
+            return df[c].dropna(how="all")
     except:
         pass
     return pd.DataFrame(columns=c)
@@ -39,15 +40,25 @@ def set_h(p, df):
         ws = sh.worksheet(p)
         ws.clear()
         if not df.empty:
-            ws.update([df.columns.values.tolist()] + df.astype(str).values.tolist())
+            # Asegurar orden de columnas y limpieza
+            df_str = df.astype(str)
+            ws.update([df_str.columns.values.tolist()] + df_str.values.tolist())
         else:
             ws.update([[]])
-    except:
-        pass
+    except Exception as e:
+        st.error(f"Error guardando en {p}: {e}")
 
 def cargar_datos():
     df_inv = get_h("inventario", ["Tipo de Tarjeta", "Cantidad Disponible"])
-    inv = {str(r["Tipo de Tarjeta"]): int(r["Cantidad Disponible"]) for _, r in df_inv.iterrows() if str(r["Tipo de Tarjeta"]) != ""}
+    inv = {}
+    for _, r in df_inv.iterrows():
+        t = str(r["Tipo de Tarjeta"]).strip()
+        if t and t != "":
+            try:
+                inv[t] = int(r["Cantidad Disponible"])
+            except:
+                inv[t] = 0
+
     ent = get_h("entradas", ["Fecha Registro", "Fecha de Llegada", "Tarjeta", "Cantidad", "Responsable"]).to_dict("records")
     tras = get_h("traslados", ["Fecha/Hora", "Tarjeta", "Cantidad", "Destino", "Responsable"]).to_dict("records")
     cred = get_h("creditos", ["Fecha", "Cliente", "Marca de Celular", "Tipo de Venta", "Aprobaron Tarjeta", "Lleva Tarjeta", "Tarjeta Entregada", "Tag Dispositivo", "Cantidad", "Asesor"]).to_dict("records")
@@ -75,15 +86,29 @@ def cargar_datos():
     marcas_list = df_m["Marca"].dropna().unique().tolist()
 
     df_meta = get_h("meta", ["Meta"])
-    meta_val = int(df_meta["Meta"].iloc[0]) if not df_meta.empty and "Meta" in df_meta.columns else 200
+    meta_val = int(df_meta["Meta"].iloc[0]) if not df_meta.empty and str(df_meta["Meta"].iloc[0]).isdigit() else 200
     return inv, ent, tras, cred, reg_t, asesores_list, marcas_list, meta_val
 
 def guardar_inv(inv):
-    set_h("inventario", pd.DataFrame(list(inv.items()), columns=["Tipo de Tarjeta", "Cantidad Disponible"]) if inv else pd.DataFrame(columns=["Tipo de Tarjeta", "Cantidad Disponible"]))
+    cols = ["Tipo de Tarjeta", "Cantidad Disponible"]
+    df = pd.DataFrame(list(inv.items()), columns=cols) if inv else pd.DataFrame(columns=cols)
+    set_h("inventario", df)
 
 def guardar_lista(clave, lista):
-    mapa = {"cred": "creditos", "reg_tarjetas": "registro_tarjetas", "ent": "entradas", "tras": "traslados", "asesores": "asesores", "marcas": "marcas"}
-    set_h(mapa.get(clave, clave), pd.DataFrame(lista) if lista else pd.DataFrame())
+    mapa = {
+        "cred": ("creditos", ["Fecha", "Cliente", "Marca de Celular", "Tipo de Venta", "Aprobaron Tarjeta", "Lleva Tarjeta", "Tarjeta Entregada", "Tag Dispositivo", "Cantidad", "Asesor"]),
+        "reg_tarjetas": ("registro_tarjetas", ["Fecha", "Cliente", "Tag Dispositivo", "Tarjeta", "Cantidad", "Asesor"]),
+        "ent": ("entradas", ["Fecha Registro", "Fecha de Llegada", "Tarjeta", "Cantidad", "Responsable"]),
+        "tras": ("traslados", ["Fecha/Hora", "Tarjeta", "Cantidad", "Destino", "Responsable"]),
+        "asesores": ("asesores", ["Asesor", "Contrasena"]),
+        "marcas": ("marcas", ["Marca"])
+    }
+    pestana, cols = mapa.get(clave, (clave, []))
+    df = pd.DataFrame(lista) if lista else pd.DataFrame(columns=cols)
+    for c in cols:
+        if c not in df.columns:
+            df[c] = ""
+    set_h(pestana, df[cols])
 
 def guardar_meta(m):
     set_h("meta", pd.DataFrame([{"Meta": m}]))
@@ -447,23 +472,4 @@ elif menu == "Gestion":
 
         with tab2:
             nueva_marca = st.text_input("Marca").strip().title()
-            if st.button("Agregar Marca", key="btn_agregar_marca"):
-                if not nueva_marca:
-                    st.error("Vacio.")
-                elif nueva_marca in MARCAS:
-                    st.warning("Ya existe.")
-                else:
-                    MARCAS.append(nueva_marca)
-                    guardar_lista("marcas", [{"Marca": m} for m in MARCAS])
-                    st.success("Agregada.")
-                    st.rerun()
-
-            st.markdown("---")
-            if MARCAS:
-                st.dataframe(pd.DataFrame(MARCAS, columns=["Marca"]), use_container_width=True)
-                marca_a_borrar = st.selectbox("Eliminar", MARCAS, key="del_m")
-                if st.button("Borrar Marca", type="primary", key="btn_del_marca"):
-                    MARCAS.remove(marca_a_borrar)
-                    guardar_lista("marcas", [{"Marca": m} for m in MARCAS])
-                    st.success("Eliminada.")
-          
+            if st.button("Agregar Marca", key="btn_agregar_marca")
