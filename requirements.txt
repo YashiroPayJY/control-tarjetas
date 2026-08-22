@@ -1,4 +1,6 @@
 streamlit
 pandas
-xlsxwriter
 plotly
+xlsxwriter
+gspread
+oauth2client
