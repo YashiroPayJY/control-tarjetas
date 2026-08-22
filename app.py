@@ -179,9 +179,9 @@ if menu == "Registrar Venta":
             })
             guardar_lista("cred", cred)
             if aprobaron == "Si" and lleva_t == "No":
-                st.success("✅ Venta registrada. Quedó guardada en Pendientes de Entrega.")
+                st.success("Venta registrada. Quedo en Pendientes de Entrega.")
             else:
-                st.success("✅ ¡Venta registrada con éxito!")
+                st.success("Venta registrada con exito.")
             st.rerun()
 
 elif menu == "Registrar Tarjeta":
@@ -381,12 +381,12 @@ elif menu == "Historiales":
 
         if cred:
             st.markdown("---")
-            st.subheader("🔐 Anular Crédito")
-            pass_anular = st.text_input("Contraseña Admin para Anular", type="password", key="pass_anulacion")
+            st.subheader("Anular Credito")
+            pass_anular = st.text_input("Password Admin", type="password", key="pass_anulacion")
             ops = ["#" + str(i) + " - " + str(c.get('Cliente')) for i, c in enumerate(cred)]
-            a_borrar = st.selectbox("Seleccione crédito", ops, key="sel_cred_anular")
+            a_borrar = st.selectbox("Seleccione", ops, key="sel_cred_anular")
             
-            if st.button("Anular Crédito", type="primary"):
+            if st.button("Anular", type="primary"):
                 if pass_anular == ADMIN_PASS:
                     idx = int(a_borrar.split("#")[1].split(" ")[0])
                     item = cred.pop(idx)
@@ -395,10 +395,10 @@ elif menu == "Historiales":
                         inventario[t] = inventario.get(t, 0) + 1
                         guardar_inv(inventario)
                     guardar_lista("cred", cred)
-                    st.success("✅ Crédito anulado.")
+                    st.success("Anulado.")
                     st.rerun()
                 else:
-                    st.error("❌ Contraseña incorrecta.")
+                    st.error("Password incorrecta.")
 
     elif sub == "Tarjetas":
         df_r = pd.DataFrame(reg_tarjetas) if reg_tarjetas else pd.DataFrame()
@@ -420,11 +420,11 @@ elif menu == "Historiales":
 
 elif menu == "Gestion":
     st.header("Gestion Admin")
-    pass_ingresada = st.text_input("Contraseña Admin", type="password", key="pass_admin_gen")
+    pass_ingresada = st.text_input("Password Admin", type="password", key="pass_admin_gen")
     
     if pass_ingresada == ADMIN_PASS:
         st.success("Acceso concedido.")
-        tab1, tab2, tab3 = st.tabs(["Asesores", "Marcas", "Meta del Mes"])
+        tab1, tab2, tab3 = st.tabs(["Asesores", "Marcas", "Meta"])
         
         with tab1:
             with st.form("f_asesor", clear_on_submit=True):
@@ -447,7 +447,7 @@ elif menu == "Gestion":
                 nombres_borrar = [str(a.get("Asesor")) for a in lista_asesores if a.get("Asesor") != "Edgardo" and "Asesor" in a]
                 if nombres_borrar:
                     asesor_a_borrar = st.selectbox("Eliminar", nombres_borrar, key="del_a")
-                    if st.button("Borrar Asesor", type="primary", key="btn_del_asesor"):
+                    if st.button("Borrar", type="primary", key="btn_del_asesor"):
                         lista_asesores = [a for a in lista_asesores if str(a.get("Asesor")) != asesor_a_borrar]
                         guardar_lista("asesores", lista_asesores)
                         st.success("Eliminado.")
@@ -471,7 +471,7 @@ elif menu == "Gestion":
             if MARCAS:
                 st.dataframe(pd.DataFrame(MARCAS, columns=["Marca"]), use_container_width=True)
                 marca_a_borrar = st.selectbox("Eliminar", MARCAS, key="del_m")
-                if st.button("Borrar Marca", type="primary", key="btn_del_marca"):
+                if st.button("Borrar", type="primary", key="btn_del_marca"):
                     MARCAS.remove(marca_a_borrar)
                     guardar_lista("marcas", [{"Marca": m} for m in MARCAS])
                     st.success("Eliminada.")
@@ -479,4 +479,6 @@ elif menu == "Gestion":
 
         with tab3:
             with st.form("f_meta", clear_on_submit=True):
-                st.subheader("Config
+                st.subheader("Meta")
+                st.write("Actual: " + str(META))
+                nueva_meta = st.nu
