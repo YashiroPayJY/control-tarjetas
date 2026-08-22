@@ -178,10 +178,7 @@ if menu == "Registrar Venta":
                 "Asesor": asesor,
             })
             guardar_lista("cred", cred)
-            if aprobaron == "Si" and lleva_t == "No":
-                st.success("Venta registrada. Quedo en Pendientes de Entrega.")
-            else:
-                st.success("Venta registrada con exito.")
+            st.success("Venta registrada con exito.")
             st.rerun()
 
 elif menu == "Registrar Tarjeta":
@@ -386,7 +383,7 @@ elif menu == "Historiales":
             ops = ["#" + str(i) + " - " + str(c.get('Cliente')) for i, c in enumerate(cred)]
             a_borrar = st.selectbox("Seleccione", ops, key="sel_cred_anular")
             
-            if st.button("Anular", type="primary"):
+            if st.button("Anular", type="primary", key="btn_anular_cred"):
                 if pass_anular == ADMIN_PASS:
                     idx = int(a_borrar.split("#")[1].split(" ")[0])
                     item = cred.pop(idx)
@@ -430,7 +427,8 @@ elif menu == "Gestion":
             with st.form("f_asesor", clear_on_submit=True):
                 nuevo_nombre = st.text_input("Asesor").strip().title()
                 nueva_pass = st.text_input("Password", type="password").strip()
-                if st.form_submit_button("Crear"):
+                submitted_asesor = st.form_submit_button("Crear")
+                if submitted_asesor:
                     if not nuevo_nombre or not nueva_pass:
                         st.error("Campos vacios.")
                     elif any(str(a.get("Asesor")) == nuevo_nombre for a in lista_asesores):
@@ -456,7 +454,8 @@ elif menu == "Gestion":
         with tab2:
             with st.form("f_marca", clear_on_submit=True):
                 nueva_marca = st.text_input("Marca").strip().title()
-                if st.form_submit_button("Agregar"):
+                submitted_marca = st.form_submit_button("Agregar")
+                if submitted_marca:
                     if not nueva_marca:
                         st.error("Vacio.")
                     elif nueva_marca in MARCAS:
@@ -481,4 +480,4 @@ elif menu == "Gestion":
             with st.form("f_meta", clear_on_submit=True):
                 st.subheader("Meta")
                 st.write("Actual: " + str(META))
-                nueva_meta = st.nu
+                nueva_meta = st.number_input("Nueva Meta", min_va
