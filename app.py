@@ -7,9 +7,7 @@ import pandas as pd
 import plotly.express as px
 import streamlit as st
 
-st.set_page_config(
-    page_title="Control Pro", page_icon="📱", layout="wide"
-)
+st.set_page_config(page_title="Control Pro", page_icon="📱", layout="wide")
 
 ARCHIVOS = {
     "inv": "inventario.csv",
@@ -46,7 +44,6 @@ def cargar_datos():
     cred = cargar_csv(ARCHIVOS["cred"]).to_dict("records") if not cargar_csv(ARCHIVOS["cred"]).empty else []
     reg_t = cargar_csv(ARCHIVOS["reg_tarjetas"]).to_dict("records") if not cargar_csv(ARCHIVOS["reg_tarjetas"]).empty else []
     
-    # Asesores
     df_as = cargar_csv(ARCHIVOS["asesores"])
     asesores_base = [
         {"Asesor": "Edgardo", "Contrasena": "1234"},
@@ -66,7 +63,6 @@ def cargar_datos():
             df_as["Asesor"] = df_as["Nombre"]
     asesores_list = df_as.to_dict("records")
 
-    # Marcas
     df_m = cargar_csv(ARCHIVOS["marcas"])
     marcas_base = ["Samsung", "Motorola", "Oppo", "Infinix", "Vivo", "Xiaomi", "Honor", "Tecno", "Realme"]
     if df_m.empty or "Marca" not in df_m.columns:
@@ -74,7 +70,6 @@ def cargar_datos():
         df_m.to_csv(ARCHIVOS["marcas"], index=False)
     marcas_list = df_m["Marca"].dropna().unique().tolist()
 
-    # Meta
     df_meta = cargar_csv(ARCHIVOS["meta"])
     meta_val = 200
     if not df_meta.empty and "Meta" in df_meta.columns:
@@ -97,8 +92,7 @@ def guardar_lista(clave, lista):
     df.to_csv(ARCHIVOS[clave], index=False)
 
 def guardar_meta(meta_num):
-    df = pd.DataFrame([{"Meta": meta_num}])
-    df.to_csv(ARCHIVOS["meta"], index=False)
+    pd.DataFrame([{"Meta": meta_num}]).to_csv(ARCHIVOS["meta"], index=False)
 
 def a_excel(df):
     out = io.BytesIO()
@@ -484,4 +478,5 @@ elif menu == "Gestion":
                     st.rerun()
 
         with tab3:
-            with s
+            with st.form("f_meta", clear_on_submit=True):
+                s
